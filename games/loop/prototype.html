@@ -185,6 +185,14 @@ canvas#field.hurt { animation: hurt .25s linear; }
 .layout { display: flex; flex-direction: column; gap: 14px; }
 .main, .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .keys { display: none; }
+/* Phones: flatten the two columns and keep the hand pinned to the bottom so tiles can be dragged onto the board. */
+@media (max-width: 959px) {
+  .main, .side { display: contents; }
+  .coach { order: 1; } .relics { order: 2; } .meter { order: 3; } .stage { order: 4; } .controls { order: 5; }
+  #handZone { order: 6; position: sticky; bottom: 0; z-index: 6; background: var(--bg); border-top: 1px solid var(--line);
+    padding-block: 8px max(8px, env(safe-area-inset-bottom, 0px)); border-radius: 0; }
+  #info { order: 7; } .sound { order: 8; } details { order: 9; } .proto { order: 10; }
+}
 @media (min-width: 960px) {
   .app { max-width: 1180px; }
   .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
@@ -207,6 +215,11 @@ canvas#field.hurt { animation: hurt .25s linear; }
 .ach .mark { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); margin-top: 2px; }
 .ach.got .mark { background: var(--gold); border-color: var(--gold); }
 .ach:not(.got) { color: var(--muted); }
+.coach { background: var(--surface); border: 2px solid var(--lead); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.coach .row b { font-size: 12px; letter-spacing: .06em; color: var(--lead); }
+.spot { outline: 3px solid var(--lead) !important; outline-offset: 2px; animation: spot 1.2s ease-in-out infinite; }
+@keyframes spot { 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .spot { animation: none; } }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
 @media (max-width: 460px) {
   .offers, .offers.two { grid-template-columns: 1fr; }
@@ -251,6 +264,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
   </div>
   </div>
   <div class="side">
+  <div class="coach" id="coach" role="status" aria-live="polite" hidden></div>
 
   <div class="sound">
     <label for="rootSel"><span data-i18n="ui.key"></span>
@@ -502,6 +516,7 @@ function nextToast() {
 
 const SAVE_KEYS = ['kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan'];
 function saveRun(pending, routeOpts) {
+  if (G && G.tutorial != null) return;
   const o = { v: 1, uid, pending: pending || null, routeOpts: routeOpts || null };
   for (const k of SAVE_KEYS) o[k] = G[k];
   store.set('run', o);
@@ -880,6 +895,7 @@ function stepUI() {
   });
   $('overLabel').textContent = G.overheat > 0 ? t('b.overheat', { n: G.overheat }) : G.muted >= 0 ? t('b.sealed', { n: G.muted + 1 }) : '';
   renderNoise();
+  if (inTutorial()) applySpots();
 }
 function renderNoise() {
   const m = noiseMax();
@@ -915,7 +931,7 @@ function renderStatus() {
   $('relics').hidden = !rel.length;
   $('relics').innerHTML = rel.map(k => `<span class="relic" title="${RELICS[k].desc}">${RELICS[k].name}</span>`).join('');
   $('playBtn').textContent = G.phase === 'play' ? t('ui.pause') : G.phase === 'paused' ? t('ui.resume') : t('ui.start');
-  $('playBtn').disabled = !['build', 'play', 'paused'].includes(G.phase);
+  $('playBtn').disabled = !['build', 'play', 'paused'].includes(G.phase) || (inTutorial() && G.tutorial < TUT_START_STEP);
   $('listenBtn').disabled = !['build', 'win'].includes(G.phase);
   $('listenBtn').textContent = G.listening ? t('ui.listenStop') : t('ui.listen');
   $('speedBtn').textContent = t('ui.speed', { n: G.speed });
@@ -964,7 +980,7 @@ function renderInfo() {
   }
   el.innerHTML = `<div>${t('i.idle')}</div>`;
 }
-function renderAll() { renderStatus(); renderBeats(); renderBoard(); renderHand(); renderInfo(); }
+function renderAll() { renderStatus(); renderBeats(); renderBoard(); renderHand(); renderInfo(); tutRender(); }
 
 // ================= input =================
 // ---- drag & drop (pointer events: works for mouse and touch) ----
@@ -1097,6 +1113,7 @@ function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a
 function stageClear() {
   G.phase = 'reward'; G.overheat = 0; G.muted = -1; G.mutedLeft = 0; G.noise = 0; setDrive(0);
   sfx('clear'); renderAll();
+  if (inTutorial()) return tutorialDone();
   if (G.node === 'boss') return showWin();
   const elite = G.node === 'elite';
   const coins = elite ? 9 : 5; G.coins += coins;
@@ -1206,6 +1223,7 @@ function statsHTML() {
   </div>`;
 }
 function gameOver() {
+  if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run');
   showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${statsHTML()}
     <div class="row"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn" id="retry">${t('o.retry')}</button></div>`);
@@ -1243,9 +1261,11 @@ function showStart() {
       <div><p class="panel-title">${t('m.rankTitle')}</p>
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
-      <div class="row"><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn" id="go">${t('m.go')}</button></div>`);
+      ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
+      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
+    $('tutBtn').onclick = () => { ensureAudio(); startTutorial(); };
     $('langStart').onchange = e => { setLang(e.target.value); draw(); };
     $('kits').onclick = e => { const b = e.target.closest('[data-kit]'); if (b) { kit = b.dataset.kit; draw(); } };
     $('ranks').onclick = e => { const b = e.target.closest('[data-r]'); if (b && !b.disabled) { rank = +b.dataset.r; draw(); } };
@@ -1291,6 +1311,64 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'l' || e.key === 'L') $('listenBtn').click();
   else if (e.key === 'x' || e.key === 'X') $('speedBtn').click();
 });
+// ================= tutorial =================
+// A scripted practice battle. Each step highlights what to touch and advances when its goal is met.
+const TUT_PLAN = [
+  { t: 3, type: 'dot', lane: 1 }, { t: 7, type: 'dot', lane: 1 }, { t: 11, type: 'dot', lane: 2 }, { t: 15, type: 'dot', lane: 1 },
+  { t: 19, type: 'shield', lane: 1 }, { t: 23, type: 'dot', lane: 2 }, { t: 26, type: 'shield', lane: 1 },
+];
+const cellSel = (l, s) => `#board .cell[data-l="${l}"][data-s="${s}"]`;
+const TUT = [
+  { key: 'tut.intro', spots: ['#field'], next: true },
+  { key: 'tut.snare', spots: ['#handZone', cellSel(1, 0)], done: () => G.board[1][0]?.id === 'snare' },
+  { key: 'tut.kick', spots: ['#handZone', cellSel(0, 0), cellSel(2, 0), cellSel(3, 0)], done: () => G.board.some(r => r[0]?.id === 'kick') },
+  { key: 'tut.tap', spots: ['#handZone'], done: () => { const c = G.selCell; return !!(c && G.board[c.l][c.s]?.id === 'bass'); } },
+  { key: 'tut.pitch', spots: ['#info'], next: true },
+  { key: 'tut.start', spots: ['#playBtn'], done: () => G.phase === 'play' },
+  { key: 'tut.watch', spots: ['#field'], done: () => G.stats.kills >= 1 },
+  { key: 'tut.moves', spots: ['#tempoLabel'], next: true },
+  { key: 'tut.shield', spots: ['#legend'] },
+];
+const TUT_START_STEP = TUT.findIndex(x => x.key === 'tut.start');
+const inTutorial = () => !!G && G.tutorial != null;
+function startTutorial() {
+  hideModal(); keepKey(() => { G = newGame('rhythm', 0); });
+  G.tutorial = 0; G.plan = TUT_PLAN.map(o => ({ ...o }));
+  renderAll();
+}
+function tutCheck() {
+  if (!inTutorial()) return;
+  const st = TUT[G.tutorial];
+  if (st.done && st.done()) { G.tutorial = Math.min(TUT.length - 1, G.tutorial + 1); tutRender(); renderStatus(); }
+}
+function tutRender() {
+  const el = $('coach');
+  if (!inTutorial()) { el.hidden = true; applySpots(); return; }
+  const st = TUT[G.tutorial];
+  el.hidden = false;
+  el.innerHTML = `<div class="row"><b>${t('tut.title')} ${G.tutorial + 1}/${TUT.length}</b><button class="btn ghost small" id="tutSkip">${t('tut.skip')}</button></div>
+    <div>${t(st.key)}</div>${st.next ? `<div class="row"><span></span><button class="btn small" id="tutNext">${t('tut.next')}</button></div>` : ''}`;
+  $('tutSkip').onclick = () => { store.set('tutorialDone', true); G.tutorial = null; tutRender(); showStart(); };
+  if (st.next) $('tutNext').onclick = () => { G.tutorial++; tutRender(); renderStatus(); };
+  applySpots();
+}
+function applySpots() {
+  document.querySelectorAll('.spot').forEach(e => e.classList.remove('spot'));
+  if (!inTutorial() || G.phase === 'menu') return;
+  for (const sel of TUT[G.tutorial].spots) document.querySelectorAll(sel).forEach(e => e.classList.add('spot'));
+}
+function tutorialDone() {
+  store.set('tutorialDone', true);
+  showModal(`<h2>${t('tut.doneTitle')}</h2><p>${t('tut.doneBody')}</p>
+    <div class="row"><span></span><button class="btn" id="tutPlay">${t('tut.play')}</button></div>`);
+  $('tutPlay').onclick = () => { G.tutorial = null; tutRender(); showStart(); };
+}
+function tutorialFailed() {
+  showModal(`<h2>${t('tut.failTitle')}</h2><p>${t('tut.failBody')}</p>
+    <div class="row"><button class="btn ghost small" id="tutQuit">${t('tut.skip')}</button><button class="btn" id="tutRetry">${t('tut.retry')}</button></div>`);
+  $('tutRetry').onclick = startTutorial;
+  $('tutQuit').onclick = () => { store.set('tutorialDone', true); G.tutorial = null; tutRender(); showStart(); };
+}
 function keepKey(fn) { const r = G ? G.root : 9, sc = G ? G.scale : 'dark', sp = G ? G.speed : 1; fn(); G.root = r; G.scale = sc; G.speed = sp; }
 
 // ================= main loop =================
@@ -1301,6 +1379,7 @@ function frame(now) {
   if (G.phase === 'play') update(dt);
   else if (G.listening) { G.acc += dt; while (G.acc >= STEP_DUR) { G.acc -= STEP_DUR; doStep(); } }
   drawField(raw);
+  tutCheck();
   requestAnimationFrame(frame);
 }
 
