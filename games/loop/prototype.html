@@ -89,8 +89,8 @@ canvas#field { width: 100%; height: 168px; display: block; border-radius: 8px; b
 .cell.drop { box-shadow: inset 0 0 0 2.5px var(--lead); }
 #handZone { border-radius: 10px; transition: background .1s; }
 #handZone.drop { background: color-mix(in srgb, var(--lead) 14%, transparent); }
-.ghost { position: fixed; left: 0; top: 0; width: 44px; height: 44px; display: grid; place-items: center; pointer-events: none; z-index: 30; filter: drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
-.ghost .tile { width: 100%; height: 100%; font-size: 16px; }
+.drag-ghost { position: fixed; left: 0; top: 0; width: 44px; height: 44px; display: grid; place-items: center; pointer-events: none; z-index: 30; filter: drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
+.drag-ghost .tile { width: 100%; height: 100%; font-size: 16px; }
 .tile { width: 72%; height: 72%; display: grid; place-items: center; font-weight: 700; font-size: clamp(11px, 3.1vw, 15px); color: #fff; line-height: 1; overflow: hidden; transition: transform .1s ease-out; position: relative; }
 .shape-circle { border-radius: 50%; }
 .shape-square { border-radius: 4px; }
@@ -103,7 +103,13 @@ canvas#field { width: 100%; height: 168px; display: block; border-radius: 8px; b
 .cat-lead { background: var(--lead); } .cat-fx { background: var(--fx); }
 .shape-ring.cat-drum { color: var(--drum); } .shape-ring.cat-bass { color: var(--bass); } .shape-ring.cat-harm { color: var(--harm); }
 .shape-ring.cat-lead { color: var(--lead); } .shape-ring.cat-fx { color: var(--fx); }
-.over-label { text-align: center; font-size: 12px; font-weight: 700; color: var(--noise); min-height: 18px; }
+.board-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 20px; font-size: 12px; }
+.over-label { font-weight: 700; color: var(--noise); }
+.tempo { color: var(--muted); }
+.tempo b { font-family: var(--f-mono); color: var(--lead); letter-spacing: .1em; font-size: 13px; }
+.tempo.empty { animation: blink .25s steps(2) 3; color: var(--noise); }
+.legend { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.legend b { color: var(--fg); font-weight: 700; }
 
 .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 button.btn {
@@ -176,9 +182,10 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
 
   <section class="stage">
     <canvas id="field" aria-label="敵が左のスピーカーに向かって進んでくるレーン"></canvas>
+    <div class="legend" id="legend"></div>
     <div class="board" id="beatNums"></div>
     <div class="board" id="board"></div>
-    <div class="over-label" id="overLabel"></div>
+    <div class="board-foot"><span class="tempo" id="tempoLabel"></span><span class="over-label" id="overLabel"></span></div>
   </section>
 
   <div class="controls">
@@ -209,14 +216,16 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
     <ul>
       <li>上のレーンを、敵が左のスピーカーに向かって進んできます。たどり着かれるとライフが減ります。</li>
       <li>下の盤面の段は、上のレーンと同じ番号です。再生位置がタイルを通ると音が鳴り、そのレーンに攻撃が出ます。</li>
-      <li>タイルはドラッグで置く・動かす・入れ替える・手持ちに戻すことができます（タップで選んでから置くこともできます）。演奏中でも置き直せます。</li>
+      <li>タイルはドラッグで置く・動かす・入れ替える・手持ちに戻すことができます（タップで選んでから置くこともできます）。</li>
+      <li>ステージ開始前は自由に置けます。演奏中の置き直しは「置き直し」ポイントを1使い、1小節ごとに1回復します（最大3）。</li>
+      <li>レーン右端の「NEXT」に、もうすぐ出てくる敵が表示されます。敵の特徴はレーンの下に書いてあります。</li>
       <li>置いたタイルをタップすると、説明と音程の変更ができます。</li>
       <li>和音は同じ列の他のタイルの攻撃を2倍にします。ノイズが30に達すると1小節演奏が止まります。</li>
       <li>音程・調・音階は好きに変えてください。強さは変わりません。</li>
       <li>ステージをクリアするとタイルを1つもらえます。2・4ステージ後は装置も選べます。5ステージ目はボスです。</li>
     </ul>
   </details>
-  <p class="proto">PROTOTYPE v0.2 — 防衛戦＋自由な音づくりの検証用</p>
+  <p class="proto">PROTOTYPE v0.3 — 置き直し制限・リズムの敵・予告</p>
 </div>
 
 <div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
@@ -242,23 +251,28 @@ const PROG = [0, 0, 2, 2, 3, 3, 1, 4];
 
 // Enemy types. speed = field-lengths per second, dmg = life lost on arrival.
 const ENEMIES = {
-  dot:   { hp: 4,   speed: .09,  dmg: 1,  armor: 0, r: 7,  shape: 'circle' },
-  dash:  { hp: 3,   speed: .17,  dmg: 1,  armor: 0, r: 7,  shape: 'tri' },
-  block: { hp: 18,  speed: .05,  dmg: 3,  armor: 1, r: 10, shape: 'square' },
-  mini:  { hp: 2,   speed: .09,  dmg: 1,  armor: 0, r: 5,  shape: 'circle' },
-  boss:  { hp: 300, speed: .02,  dmg: 6,  armor: 0, r: 16, shape: 'hex' },
+  dot:     { hp: 4,   speed: .09,  dmg: 1, armor: 0, r: 7,  shape: 'circle', name: 'ドット', desc: '普通の敵' },
+  dash:    { hp: 3,   speed: .17,  dmg: 1, armor: 0, r: 7,  shape: 'tri',    name: 'ダッシュ', desc: '速い' },
+  block:   { hp: 18,  speed: .05,  dmg: 3, armor: 1, r: 10, shape: 'square', name: 'ブロック', desc: '硬い（受けるダメージ-1）' },
+  shield:  { hp: 6,   speed: .07,  dmg: 1, armor: 0, r: 8,  shape: 'shield', name: 'シールド', desc: '奇数拍（1・3・5・7拍目）の攻撃しか効かない' },
+  mirror:  { hp: 5,   speed: .08,  dmg: 1, armor: 0, r: 8,  shape: 'mirror', name: 'ミラー', desc: 'スネアを跳ね返す（ダメージ無効・ノイズ+2）' },
+  stealth: { hp: 4,   speed: .1,   dmg: 1, armor: 0, r: 7,  shape: 'circle', stealth: true, name: 'ステルス', desc: 'ハットかシンバルが当たるまで他の攻撃が当たらない' },
+  split:   { hp: 6,   speed: .07,  dmg: 2, armor: 0, r: 9,  shape: 'split',  name: 'スプリット', desc: '倒すとミニ2体に分かれる' },
+  mini:    { hp: 2,   speed: .09,  dmg: 1, armor: 0, r: 5,  shape: 'circle', name: 'ミニ', desc: '小さい敵' },
+  boss:    { hp: 300, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex',    name: 'テンポ泥棒', desc: 'レーンを移り、拍を封印し、ミニを呼ぶ' },
 };
+const TEMPO_MAX = 3;
 
 function wave(list, type, count, start, interval, lanes) {
   for (let i = 0; i < count; i++) list.push({ t: start + i * interval, type, lanes });
 }
 const ALL = [0, 1, 2, 3];
 const STAGES = [
-  { name: 'STAGE 1', make: l => { wave(l, 'dot', 14, 2, 2.2, [1, 2]); } },
-  { name: 'STAGE 2', make: l => { wave(l, 'dot', 18, 2, 1.8, ALL); wave(l, 'dash', 8, 8, 3.5, ALL); } },
-  { name: 'STAGE 3', make: l => { wave(l, 'dot', 22, 2, 1.4, ALL); wave(l, 'dash', 10, 6, 3, ALL); wave(l, 'block', 6, 10, 5, ALL); } },
-  { name: 'STAGE 4', make: l => { wave(l, 'dot', 30, 2, 1.1, ALL); wave(l, 'dash', 16, 4, 2.2, ALL); wave(l, 'block', 10, 8, 4, ALL); } },
-  { name: 'BOSS', boss: true, make: l => { l.push({ t: 2, type: 'boss', lanes: [1] }); wave(l, 'dot', 16, 6, 2.5, ALL); wave(l, 'dash', 10, 15, 4, ALL); } },
+  { name: 'STAGE 1', make: l => { wave(l, 'dot', 12, 2, 2.4, [1, 2]); wave(l, 'shield', 3, 16, 6, [1, 2]); } },
+  { name: 'STAGE 2', make: l => { wave(l, 'dot', 16, 2, 1.9, ALL); wave(l, 'dash', 6, 8, 4, ALL); wave(l, 'mirror', 5, 12, 5, ALL); } },
+  { name: 'STAGE 3', make: l => { wave(l, 'dot', 18, 2, 1.5, ALL); wave(l, 'dash', 8, 6, 3.5, ALL); wave(l, 'block', 4, 12, 7, ALL); wave(l, 'stealth', 6, 8, 4.5, ALL); } },
+  { name: 'STAGE 4', make: l => { wave(l, 'dot', 18, 2, 1.6, ALL); wave(l, 'dash', 8, 4, 3.5, ALL); wave(l, 'block', 5, 10, 7, ALL); wave(l, 'split', 5, 6, 6, ALL); wave(l, 'shield', 3, 14, 7, ALL); wave(l, 'mirror', 3, 18, 7, ALL); wave(l, 'stealth', 3, 20, 6, ALL); } },
+  { name: 'BOSS', boss: true, make: l => { l.push({ t: 2, type: 'boss', lanes: [1] }); wave(l, 'dot', 12, 6, 3, ALL); wave(l, 'dash', 6, 15, 5, ALL); wave(l, 'shield', 4, 10, 7, ALL); wave(l, 'stealth', 4, 20, 6, ALL); } },
 ];
 
 const RELICS = {
@@ -326,13 +340,19 @@ function newGame() {
     phase: 'build', listening: false, speed: 1,
     selHand: -1, selCell: null,
     root: 9, scale: 'dark',
+    plan: makePlan(0),
     ...freshStage(),
   };
+}
+// Lanes are decided up front so the NEXT preview shows exactly what will come.
+function makePlan(stage) {
+  const list = []; STAGES[stage].make(list); list.sort((a, b) => a.t - b.t);
+  return list.map(o => ({ t: o.t, type: o.type, lane: o.lanes[Math.floor(Math.random() * o.lanes.length)] }));
 }
 function freshStage() {
   return { t: 0, acc: 0, step: -1, stepCount: 0, loop: 0, noise: 0, overheat: 0,
            enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
-           muted: -1, mutedLeft: 0, hits: [] };
+           muted: -1, mutedLeft: 0, hits: [], tempo: TEMPO_MAX };
 }
 const noiseMax = () => G.relics.gate ? 42 : 30;
 
@@ -426,45 +446,61 @@ function sfx(kind) {
 }
 
 // ================= gameplay =================
-function frontmost(lane) { let best = null; for (const e of G.enemies) if (e.lane === lane && e.hp > 0 && (!best || e.x < best.x)) best = e; return best; }
-function backmost(lane) { let best = null; for (const e of G.enemies) if (e.lane === lane && e.hp > 0 && (!best || e.x > best.x)) best = e; return best; }
-function damage(e, amount, color) {
+const reveals = src => src === 'hat' || src === 'cymbal';
+const targetable = (e, src) => e.hp > 0 && (!ENEMIES[e.type].stealth || e.revealed || reveals(src));
+function frontmost(lane, src) { let best = null; for (const e of G.enemies) if (e.lane === lane && targetable(e, src) && (!best || e.x < best.x)) best = e; return best; }
+function backmost(lane, src) { let best = null; for (const e of G.enemies) if (e.lane === lane && targetable(e, src) && (!best || e.x > best.x)) best = e; return best; }
+function damage(e, amount, color, src) {
   if (!e || e.hp <= 0) return;
+  if (ENEMIES[e.type].stealth && reveals(src)) e.revealed = true;
+  if (e.type === 'shield' && G.step % 2 === 1) {
+    G.texts.push({ lane: e.lane, x: e.x, txt: '無効', life: .5 });
+    G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color: 'fx', life: .1, max: .1 });
+    return;
+  }
+  if (e.type === 'mirror' && src === 'snare') {
+    G.noise += 2;
+    G.texts.push({ lane: e.lane, x: e.x, txt: '反射', life: .5, warn: true });
+    G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color: 'noise', life: .16, max: .16 });
+    return;
+  }
   const d = Math.max(1, Math.round(amount) - e.armor);
   e.hp -= d; e.flash = .12;
   G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
   G.texts.push({ lane: e.lane, x: e.x, txt: String(d), life: .6 });
   if (e.hp <= 0) {
     G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', life: .3, max: .3, r: e.r });
+    if (e.type === 'split') { spawn('mini', e.lane, Math.min(1, e.x + .03)); spawn('mini', e.lane, Math.min(1, e.x + .08)); }
   }
 }
-function makeCtx(lane, step, mul, color) {
+function makeCtx(lane, step, mul, color, src) {
   return {
     lane, step, loop: G.loop, noise: G.noise, relic: G.relics,
     drumBonus: G.relics.amp ? 1 : 0,
-    hitFront: (l, d) => damage(frontmost(l), d * mul, color),
-    hitBack: (l, d) => damage(backmost(l), d * mul, color),
-    hitAll: (l, d) => { for (const e of G.enemies.filter(e => e.lane === l && e.hp > 0)) damage(e, d * mul, color); },
+    hitFront: (l, d) => damage(frontmost(l, src), d * mul, color, src),
+    hitBack: (l, d) => damage(backmost(l, src), d * mul, color, src),
+    hitAll: (l, d) => { for (const e of G.enemies.filter(e => e.lane === l && targetable(e, src))) damage(e, d * mul, color, src); },
     slow: (l, s) => { for (const e of G.enemies) if (e.lane === l) e.slow = Math.max(e.slow, s); G.fx.push({ kind: 'lane', lane: l, color, life: .25, max: .25 }); },
-    knock: (l, a) => { const e = frontmost(l); if (e && e.type !== 'boss') { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
+    knock: (l, a) => { const e = frontmost(l, src); if (e && ENEMIES[e.type].stealth) e.revealed = true; if (e && e.type !== 'boss') { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
     later: (n, fn) => G.delayed.push({ at: G.stepCount + n, fn }),
   };
 }
-function spawn(type, lanes) {
+function spawn(type, lane, x = 1) {
   const T = ENEMIES[type];
-  const lane = lanes[Math.floor(Math.random() * lanes.length)];
-  G.enemies.push({ type, lane, x: 1, hp: T.hp, max: T.hp, speed: T.speed, dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
+  G.enemies.push({ type, lane, x, revealed: false, hp: T.hp, max: T.hp, speed: T.speed, dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
 }
 function startStage() {
   Object.assign(G, freshStage());
-  const list = []; STAGES[G.stage].make(list); list.sort((a, b) => a.t - b.t);
-  G.spawns = list; G.phase = 'play'; G.listening = false; setDrive(0);
+  G.spawns = G.plan.map(o => ({ ...o })); G.phase = 'play'; G.listening = false; setDrive(0);
   renderAll();
 }
 function doStep() {
   G.step = (G.step + 1) % STEPS;
   G.stepCount++;
-  if (G.step === 0 && G.stepCount > 1) G.loop++;
+  if (G.step === 0 && G.stepCount > 1) {
+    G.loop++;
+    if (G.phase === 'play' && G.tempo < TEMPO_MAX) { G.tempo++; renderTempo(); }
+  }
   G.hits = [];
   // delayed effects (echo)
   const due = G.delayed.filter(d => d.at <= G.stepCount); G.delayed = G.delayed.filter(d => d.at > G.stepCount);
@@ -491,7 +527,7 @@ function doStep() {
   for (const c of col) {
     const d = DEFS[c.t.id];
     const mul = mulBase * (c.t.id === 'chord' ? 1 : Math.pow(2, chords));
-    if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, mul, d.cat));
+    if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, mul, d.cat, c.t.id));
     G.noise = Math.max(0, G.noise + (G.phase === 'play' ? d.noise : 0));
     if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
   }
@@ -510,12 +546,12 @@ function bossLogic() {
     G.muted = Math.floor(Math.random() * STEPS); G.mutedLeft = STEPS;
     G.texts.push({ lane: boss.lane, x: boss.x, txt: `${G.muted + 1}拍目を封印`, life: 1.6, warn: true });
   }
-  if (G.stepCount % 8 === 0) spawn('mini', ALL);
+  if (G.stepCount % 8 === 0) spawn('mini', Math.floor(Math.random() * LANES));
 }
 function update(dt) {
   G.t += dt;
   while (G.spawnIdx < G.spawns.length && G.spawns[G.spawnIdx].t <= G.t) {
-    const s = G.spawns[G.spawnIdx++]; spawn(s.type, s.lanes);
+    const s = G.spawns[G.spawnIdx++]; spawn(s.type, s.lane);
   }
   for (const e of G.enemies) {
     if (e.hp <= 0) continue;
@@ -544,11 +580,31 @@ function sizeCanvas() {
 }
 const css = n => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
 function laneY(l) { const h = CH / LANES; return h * l + h / 2; }
-const BASE_X = 26;
-function xPix(x) { return BASE_X + 10 + x * (CW - BASE_X - 26); }
+const BASE_X = 26, QUEUE_W = 50;
+function xPix(x) { return BASE_X + 10 + x * (CW - BASE_X - 22 - QUEUE_W); }
+function drawShape(shape, x, y, r, C, opt = {}) {
+  cx.fillStyle = opt.flash ? C.noise : C.enemy;
+  cx.strokeStyle = C.enemy;
+  if (opt.hidden) {
+    cx.save(); cx.setLineDash([3, 3]); cx.lineWidth = 1.5; cx.globalAlpha *= .6;
+    cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.stroke(); cx.restore(); return;
+  }
+  cx.beginPath();
+  if (shape === 'circle') cx.arc(x, y, r, 0, Math.PI * 2);
+  else if (shape === 'tri') { cx.moveTo(x - r, y); cx.lineTo(x + r, y - r * .85); cx.lineTo(x + r, y + r * .85); cx.closePath(); }
+  else if (shape === 'square') cx.rect(x - r, y - r, r * 2, r * 2);
+  else if (shape === 'mirror') { cx.moveTo(x, y - r); cx.lineTo(x + r, y); cx.lineTo(x, y + r); cx.lineTo(x - r, y); cx.closePath(); }
+  else if (shape === 'shield') cx.arc(x + 2, y, r * .8, 0, Math.PI * 2);
+  else if (shape === 'split') { cx.arc(x - r * .4, y, r * .62, 0, Math.PI * 2); cx.moveTo(x + r * .4 + r * .62, y); cx.arc(x + r * .4, y, r * .62, 0, Math.PI * 2); }
+  else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
+  cx.fill();
+  if (shape === 'shield') { cx.lineWidth = 2.5; cx.beginPath(); cx.arc(x + 2, y, r + 2, Math.PI * .6, Math.PI * 1.4); cx.stroke(); }
+  if (shape === 'mirror') { cx.strokeStyle = C.bg; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(x - r * .4, y - r * .2); cx.lineTo(x + r * .2, y - r * .5); cx.stroke(); }
+  if (opt.slow) { cx.strokeStyle = C.bass; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r + 3, 0, Math.PI * 2); cx.stroke(); }
+}
 function drawField(dt) {
   if (!CW) sizeCanvas();
-  const C = { fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
+  const C = { bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
               drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') };
   cx.clearRect(0, 0, CW, CH);
   const lh = CH / LANES;
@@ -570,19 +626,29 @@ function drawField(dt) {
     f.life -= dt;
   }
   G.fx = G.fx.filter(f => f.life > 0);
+  // NEXT queue
+  const qx = CW - QUEUE_W;
+  cx.save(); cx.strokeStyle = C.line; cx.setLineDash([3, 4]); cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(qx - 4, 4); cx.lineTo(qx - 4, CH - 4); cx.stroke(); cx.restore();
+  cx.fillStyle = C.muted; cx.font = '600 9px "IBM Plex Mono", monospace'; cx.textAlign = 'center';
+  cx.fillText('NEXT', qx + QUEUE_W / 2 - 2, 8);
+  const upcoming = G.phase === 'build' ? G.plan : G.spawns.slice(G.spawnIdx);
+  const horizon = G.phase === 'build' ? 8 : G.t + 6;
+  const perLane = [0, 0, 0, 0];
+  for (const o of upcoming) {
+    if (o.t > horizon) break;
+    if (perLane[o.lane] >= 3) continue;
+    const k = perLane[o.lane]++;
+    const soon = G.phase === 'build' ? o.t / 8 : (o.t - G.t) / 6;
+    cx.globalAlpha = 1 - Math.max(0, Math.min(1, soon)) * .65;
+    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), o.type === 'boss' ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth });
+  }
+  cx.globalAlpha = 1;
   // enemies
   for (const e of G.enemies) {
     const x = xPix(e.x), y = laneY(e.lane), r = e.r;
-    cx.fillStyle = e.flash > 0 ? C.noise : C.enemy;
-    cx.strokeStyle = C.bass;
-    cx.beginPath();
-    if (e.shape === 'circle') cx.arc(x, y, r, 0, Math.PI * 2);
-    else if (e.shape === 'tri') { cx.moveTo(x - r, y); cx.lineTo(x + r, y - r * .85); cx.lineTo(x + r, y + r * .85); cx.closePath(); }
-    else if (e.shape === 'square') cx.rect(x - r, y - r, r * 2, r * 2);
-    else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
-    cx.fill();
-    if (e.slow > 0) { cx.lineWidth = 2; cx.stroke(); }
-    if (e.max > 3) { // hp bar
+    drawShape(e.shape, x, y, r, C, { flash: e.flash > 0, slow: e.slow > 0, hidden: ENEMIES[e.type].stealth && !e.revealed });
+    if (e.max > 3 && !(ENEMIES[e.type].stealth && !e.revealed)) { // hp bar
       cx.fillStyle = C.line; cx.fillRect(x - r, y - r - 6, r * 2, 3);
       cx.fillStyle = C.life; cx.fillRect(x - r, y - r - 6, r * 2 * Math.max(0, e.hp / e.max), 3);
     }
@@ -601,7 +667,7 @@ function drawField(dt) {
   G.texts = G.texts.filter(t => t.life > 0);
   if (G.phase === 'build' && !G.listening) {
     cx.fillStyle = C.muted; cx.font = '500 13px "Zen Kaku Gothic New", sans-serif'; cx.textAlign = 'center';
-    cx.fillText(`${STAGES[G.stage].name}　タイルを並べて「ステージ開始」`, CW / 2 + 10, CH / 2);
+    cx.fillText(`${STAGES[G.stage].name}　タイルを並べて「ステージ開始」`, (CW - QUEUE_W) / 2 + 10, CH / 2);
   }
 }
 
@@ -648,7 +714,27 @@ function renderNoise() {
   $('noiseBar').firstElementChild.style.width = Math.min(100, G.noise / m * 100) + '%';
   $('noiseBar').classList.toggle('hot', G.noise >= m * .75 || G.overheat > 0);
 }
+function renderTempo() {
+  const el = $('tempoLabel');
+  if (G.phase === 'build') { el.innerHTML = '準備中：自由に置き直せます'; return; }
+  if (!['play', 'paused'].includes(G.phase)) { el.innerHTML = ''; return; }
+  el.innerHTML = `置き直し <b>${'●'.repeat(G.tempo)}${'○'.repeat(TEMPO_MAX - G.tempo)}</b>　1小節ごとに1回復`;
+}
+// Spend one re-placement during a stage. Free while preparing.
+function spendEdit() {
+  if (G.phase === 'build') return true;
+  if (G.tempo >= 1) { G.tempo--; renderTempo(); return true; }
+  const el = $('tempoLabel'); el.classList.remove('empty'); void el.offsetWidth; el.classList.add('empty');
+  el.addEventListener('animationend', () => el.classList.remove('empty'), { once: true });
+  return false;
+}
+function renderLegend() {
+  const types = [...new Set(G.plan.map(o => o.type))];
+  if (STAGES[G.stage].boss) types.push('mini');
+  $('legend').innerHTML = types.map(t => `<span><b>${ENEMIES[t].name}</b> ${ENEMIES[t].desc}</span>`).join('');
+}
 function renderStatus() {
+  renderTempo(); renderLegend();
   $('stageLabel').textContent = `STAGE ${G.stage + 1}/${STAGES.length}${STAGES[G.stage].boss ? '　BOSS' : ''}`;
   $('lifeLabel').textContent = `♥ ${Math.max(0, G.life)}`;
   const rel = Object.keys(G.relics);
@@ -699,7 +785,7 @@ function renderInfo() {
     $('pUp') && ($('pUp').onclick = () => bump(1));
     $('pDown') && ($('pDown').onclick = () => bump(-1));
     $('pAuto') && ($('pAuto').onclick = () => { t.p = null; ensureAudio(); playTile(t, l, s); renderBoard(); renderInfo(); });
-    $('toHand').onclick = () => { G.board[l][s] = null; G.hand.push(t); G.selCell = null; renderAll(); };
+    $('toHand').onclick = () => { if (!spendEdit()) return; G.board[l][s] = null; G.hand.push(t); G.selCell = null; renderAll(); };
     return;
   }
   el.innerHTML = `<div>手持ちのタイルを盤面へドラッグして置いてください。盤面のタイルもドラッグで移動・入れ替えできます。タップすると説明と音程の変更ができます。</div>`;
@@ -724,7 +810,7 @@ document.addEventListener('pointermove', e => {
   if (!drag.moved) {
     if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
     drag.moved = true; ensureAudio();
-    drag.ghost = document.createElement('div'); drag.ghost.className = 'ghost';
+    drag.ghost = document.createElement('div'); drag.ghost.className = 'drag-ghost';
     drag.ghost.innerHTML = tileHTML(drag.tile.id); document.body.appendChild(drag.ghost);
     drag.el.classList.add('dragging');
   }
@@ -761,15 +847,18 @@ function endDrag(e, cancel) {
     const cur = G.board[t.l][t.s];
     if (d.from === 'board') {
       if (G.board[d.l][d.s] !== d.tile || (d.l === t.l && d.s === t.s)) return;
+      if (!spendEdit()) return;
       G.board[d.l][d.s] = cur; G.board[t.l][t.s] = d.tile;
     } else {
       const i = G.hand.indexOf(d.tile); if (i < 0) return;
+      if (!spendEdit()) return;
       G.hand.splice(i, 1); G.board[t.l][t.s] = d.tile; if (cur) G.hand.push(cur);
     }
     G.selHand = -1; G.selCell = { l: t.l, s: t.s };
     playTile(d.tile, t.l, t.s);
   } else if (t?.hand && d.from === 'board') {
     if (G.board[d.l][d.s] !== d.tile) return;
+    if (!spendEdit()) return;
     G.board[d.l][d.s] = null; G.hand.push(d.tile); G.selCell = null; G.selHand = -1;
   } else return;
   renderBoard(); renderHand(); renderInfo();
@@ -784,6 +873,7 @@ boardEl.addEventListener('click', e => {
   ensureAudio();
   const l = +c.dataset.l, s = +c.dataset.s, cur = G.board[l][s];
   if (G.selHand >= 0) {
+    if (!spendEdit()) return;
     const t = G.hand.splice(G.selHand, 1)[0];
     G.board[l][s] = t; if (cur) G.hand.push(cur);
     G.selHand = -1; G.selCell = { l, s };
@@ -857,7 +947,7 @@ function relicPick() {
   };
 }
 function nextStage() {
-  hideModal(); G.stage++; Object.assign(G, freshStage()); G.phase = 'build'; G.selHand = -1; G.selCell = null; renderAll();
+  hideModal(); G.stage++; Object.assign(G, freshStage()); G.plan = makePlan(G.stage); G.phase = 'build'; G.selHand = -1; G.selCell = null; renderAll();
 }
 function gameOver() {
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll();
@@ -890,7 +980,7 @@ function frame(now) {
 G = newGame();
 fillSelects();
 renderAll();
-window.__g = { get G() { return G; }, DEFS, STAGES, startStage, doStep, update };
+window.__g = { get G() { return G; }, DEFS, STAGES, startStage, doStep, update, makePlan };
 requestAnimationFrame(frame);
 })();
 </script>
