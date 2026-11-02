@@ -84,6 +84,13 @@ canvas#field { width: 100%; height: 168px; display: block; border-radius: 8px; b
 .cell.hit .tile { transform: scale(1.2); }
 .cell.custom::after { content: "♪"; position: absolute; right: 2px; top: 0; font-size: 10px; color: var(--muted); }
 .board.over .cell { filter: grayscale(1); opacity: .5; }
+.cell, .chip { touch-action: none; -webkit-user-select: none; user-select: none; }
+.cell.dragging .tile, .chip.dragging { opacity: .25; }
+.cell.drop { box-shadow: inset 0 0 0 2.5px var(--lead); }
+#handZone { border-radius: 10px; transition: background .1s; }
+#handZone.drop { background: color-mix(in srgb, var(--lead) 14%, transparent); }
+.ghost { position: fixed; left: 0; top: 0; width: 44px; height: 44px; display: grid; place-items: center; pointer-events: none; z-index: 30; filter: drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
+.ghost .tile { width: 100%; height: 100%; font-size: 16px; }
 .tile { width: 72%; height: 72%; display: grid; place-items: center; font-weight: 700; font-size: clamp(11px, 3.1vw, 15px); color: #fff; line-height: 1; overflow: hidden; transition: transform .1s ease-out; position: relative; }
 .shape-circle { border-radius: 50%; }
 .shape-square { border-radius: 4px; }
@@ -190,8 +197,8 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
     <span class="hint">音の設定は強さに影響しません</span>
   </div>
 
-  <section>
-    <p class="panel-title">手持ちのタイル（選んでからマスへ）</p>
+  <section id="handZone">
+    <p class="panel-title">手持ちのタイル（盤面へドラッグ。盤面からここへ戻すこともできます）</p>
     <div class="hand" id="hand"></div>
   </section>
 
@@ -202,7 +209,8 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
     <ul>
       <li>上のレーンを、敵が左のスピーカーに向かって進んできます。たどり着かれるとライフが減ります。</li>
       <li>下の盤面の段は、上のレーンと同じ番号です。再生位置がタイルを通ると音が鳴り、そのレーンに攻撃が出ます。</li>
-      <li>演奏中でもタイルは置き直せます。置いたタイルを選ぶと、説明と音程の変更ができます。</li>
+      <li>タイルはドラッグで置く・動かす・入れ替える・手持ちに戻すことができます（タップで選んでから置くこともできます）。演奏中でも置き直せます。</li>
+      <li>置いたタイルをタップすると、説明と音程の変更ができます。</li>
       <li>和音は同じ列の他のタイルの攻撃を2倍にします。ノイズが30に達すると1小節演奏が止まります。</li>
       <li>音程・調・音階は好きに変えてください。強さは変わりません。</li>
       <li>ステージをクリアするとタイルを1つもらえます。2・4ステージ後は装置も選べます。5ステージ目はボスです。</li>
@@ -694,12 +702,83 @@ function renderInfo() {
     $('toHand').onclick = () => { G.board[l][s] = null; G.hand.push(t); G.selCell = null; renderAll(); };
     return;
   }
-  el.innerHTML = `<div>手持ちのタイルを選んでマスに置いてください。置いたタイルを選ぶと、説明を見たり音程を変えたりできます。</div>`;
+  el.innerHTML = `<div>手持ちのタイルを盤面へドラッグして置いてください。盤面のタイルもドラッグで移動・入れ替えできます。タップすると説明と音程の変更ができます。</div>`;
 }
 function renderAll() { renderStatus(); renderBeats(); renderBoard(); renderHand(); renderInfo(); }
 
 // ================= input =================
+// ---- drag & drop (pointer events: works for mouse and touch) ----
+let drag = null, suppressClick = false;
+const canEdit = () => ['build', 'play', 'paused'].includes(G.phase);
+document.addEventListener('pointerdown', e => {
+  if (!canEdit() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const cell = e.target.closest('#board .cell'), chip = e.target.closest('#hand .chip');
+  let src = null;
+  if (cell) { const l = +cell.dataset.l, s = +cell.dataset.s, t = G.board[l][s]; if (!t) return; src = { from: 'board', l, s, tile: t, el: cell }; }
+  else if (chip) { const t = G.hand[+chip.dataset.i]; if (!t) return; src = { from: 'hand', tile: t, el: chip }; }
+  else return;
+  drag = { ...src, id: e.pointerId, x0: e.clientX, y0: e.clientY, moved: false, ghost: null };
+});
+document.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+    drag.moved = true; ensureAudio();
+    drag.ghost = document.createElement('div'); drag.ghost.className = 'ghost';
+    drag.ghost.innerHTML = tileHTML(drag.tile.id); document.body.appendChild(drag.ghost);
+    drag.el.classList.add('dragging');
+  }
+  e.preventDefault();
+  drag.ghost.style.transform = `translate(${e.clientX - 22}px, ${e.clientY - 22}px)`;
+  markDrop(e.clientX, e.clientY);
+}, { passive: false });
+function dropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const cell = el.closest('#board .cell');
+  if (cell) return { cell, l: +cell.dataset.l, s: +cell.dataset.s };
+  if (el.closest('#handZone')) return { hand: true };
+  return null;
+}
+function markDrop(x, y) {
+  document.querySelectorAll('.cell.drop').forEach(c => c.classList.remove('drop'));
+  $('handZone').classList.remove('drop');
+  const t = dropTarget(x, y);
+  if (t?.cell) t.cell.classList.add('drop');
+  else if (t?.hand && drag.from === 'board') $('handZone').classList.add('drop');
+}
+function endDrag(e, cancel) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null;
+  document.querySelectorAll('.cell.drop').forEach(c => c.classList.remove('drop'));
+  $('handZone').classList.remove('drop');
+  if (!d.moved) return;
+  d.ghost.remove(); d.el.classList.remove('dragging');
+  suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+  if (cancel || !canEdit()) return;
+  const t = dropTarget(e.clientX, e.clientY);
+  if (t?.cell) {
+    const cur = G.board[t.l][t.s];
+    if (d.from === 'board') {
+      if (G.board[d.l][d.s] !== d.tile || (d.l === t.l && d.s === t.s)) return;
+      G.board[d.l][d.s] = cur; G.board[t.l][t.s] = d.tile;
+    } else {
+      const i = G.hand.indexOf(d.tile); if (i < 0) return;
+      G.hand.splice(i, 1); G.board[t.l][t.s] = d.tile; if (cur) G.hand.push(cur);
+    }
+    G.selHand = -1; G.selCell = { l: t.l, s: t.s };
+    playTile(d.tile, t.l, t.s);
+  } else if (t?.hand && d.from === 'board') {
+    if (G.board[d.l][d.s] !== d.tile) return;
+    G.board[d.l][d.s] = null; G.hand.push(d.tile); G.selCell = null; G.selHand = -1;
+  } else return;
+  renderBoard(); renderHand(); renderInfo();
+}
+document.addEventListener('pointerup', e => endDrag(e, false));
+document.addEventListener('pointercancel', e => endDrag(e, true));
+
 boardEl.addEventListener('click', e => {
+  if (suppressClick) return;
   const c = e.target.closest('.cell'); if (!c) return;
   if (!['build', 'play', 'paused'].includes(G.phase)) return;
   ensureAudio();
@@ -716,6 +795,7 @@ boardEl.addEventListener('click', e => {
   renderBoard(); renderHand(); renderInfo();
 });
 $('hand').addEventListener('click', e => {
+  if (suppressClick) return;
   const c = e.target.closest('.chip'); if (!c) return;
   const i = +c.dataset.i;
   G.selHand = G.selHand === i ? -1 : i; G.selCell = null;
