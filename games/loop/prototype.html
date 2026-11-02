@@ -1,0 +1,640 @@
+<title>LOOP</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow column like a hardware sequencer — status on top, the 4x8 grid as the instrument, hand + controls below. */
+:root {
+  --bg: #e9ecf1;
+  --surface: #f8f9fb;
+  --cell: #dfe3ea;
+  --fg: #1a1e29;
+  --muted: #687085;
+  --line: #cdd2dc;
+  --heat: #e2643c;
+  --noise: #c93a57;
+  --gold: #b9861c;
+  --drum: #2f69d6;
+  --bass: #138f7d;
+  --harm: #8656d2;
+  --lead: #d9831a;
+  --fx: #5d6679;
+  --playhead: rgba(47, 105, 214, .12);
+  --spot: rgba(217, 131, 26, .18);
+  --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
+    --heat: #f07a52; --noise: #e45773; --gold: #e0ad45;
+    --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
+    --playhead: rgba(91, 142, 240, .16); --spot: rgba(240, 162, 64, .2);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
+  --heat: #f07a52; --noise: #e45773; --gold: #e0ad45;
+  --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
+  --playhead: rgba(91, 142, 240, .16); --spot: rgba(240, 162, 64, .2);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.55; }
+.app {
+  max-width: 680px; margin: 0 auto;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+}
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: 34px; letter-spacing: .08em; margin: 0; line-height: 1; }
+.round-info { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.boss-tag { font-family: var(--f-body); font-weight: 700; font-size: 12px; color: var(--noise); border: 1.5px solid var(--noise); padding: 1px 8px; border-radius: 99px; }
+.coins { color: var(--gold); font-weight: 600; }
+
+.meters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.meter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.meter-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.meter-label b { font-family: var(--f-mono); color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 10px; background: var(--cell); border-radius: 5px; overflow: hidden; position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--heat); border-radius: 5px; transition: width .18s ease-out; }
+#noiseBar > i { background: var(--noise); }
+.passes { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.passes span { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.passes span.done { background: var(--fg); border-color: var(--fg); }
+.passes span.now { border-color: var(--heat); background: var(--heat); }
+
+.board-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; position: relative; }
+.board-wrap.shake { animation: shake .12s linear infinite; }
+@keyframes shake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(1px,-1px); } 75% { transform: translate(-1px,1px); } }
+.board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; position: relative; }
+.beat-num { text-align: center; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.beat-num.off { opacity: .45; }
+.col-bg { position: absolute; top: 0; bottom: 0; border-radius: 8px; pointer-events: none; transition: background .08s; }
+.cell {
+  aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--cell); border: none; padding: 0;
+  display: grid; place-items: center; cursor: pointer; position: relative; color: var(--fg); font: inherit;
+}
+.cell:focus-visible, .chip:focus-visible, button:focus-visible { outline: 2px solid var(--drum); outline-offset: 2px; }
+.cell.target { box-shadow: inset 0 0 0 2px var(--drum); }
+.cell.hit .tile { transform: scale(1.18); }
+.tile { width: 74%; height: 74%; display: grid; place-items: center; font-weight: 700; font-size: clamp(11px, 3.2vw, 16px); color: #fff; line-height: 1; overflow: hidden; transition: transform .1s ease-out; position: relative; }
+.tile.shadow { opacity: .45; }
+.shape-circle { border-radius: 50%; }
+.shape-square { border-radius: 4px; }
+.shape-diamond { border-radius: 4px; transform: rotate(45deg) scale(.82); }
+.shape-diamond > em { transform: rotate(-45deg); font-style: normal; }
+.cell.hit .shape-diamond { transform: rotate(45deg) scale(1); }
+.shape-tri { clip-path: polygon(50% 4%, 100% 92%, 0 92%); align-content: end; padding-bottom: 12%; }
+.shape-ring { border-radius: 50%; background: transparent !important; border: 3px solid currentColor; }
+.cat-drum { background: var(--drum); }
+.cat-bass { background: var(--bass); }
+.cat-harm { background: var(--harm); }
+.cat-lead { background: var(--lead); }
+.cat-fx { background: var(--fx); }
+.shape-ring.cat-drum { color: var(--drum); } .shape-ring.cat-bass { color: var(--bass); } .shape-ring.cat-harm { color: var(--harm); }
+.shape-ring.cat-lead { color: var(--lead); } .shape-ring.cat-fx { color: var(--fx); }
+.float { position: absolute; top: -4px; transform: translateX(-50%); font-family: var(--f-mono); font-weight: 600; font-size: 13px; color: var(--heat); pointer-events: none; animation: rise .8s ease-out forwards; white-space: nowrap; z-index: 3; }
+.float.n { color: var(--noise); top: auto; bottom: -6px; animation-name: sink; }
+@keyframes rise { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -26px); } }
+@keyframes sink { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 14px); } }
+.spot-label { position: absolute; top: -18px; transform: translateX(-50%); font-family: var(--f-mono); font-size: 11px; font-weight: 600; color: var(--lead); }
+.preview { margin-top: 10px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.preview b { font-family: var(--f-mono); color: var(--fg); font-weight: 600; }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+button.btn {
+  font: inherit; font-weight: 700; padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--fg);
+  background: var(--fg); color: var(--bg); cursor: pointer; letter-spacing: .04em;
+}
+button.btn.ghost { background: transparent; color: var(--fg); }
+button.btn:disabled { opacity: .35; cursor: default; }
+button.btn.small { padding: 6px 12px; font-size: 13px; }
+
+.panel-title { font-size: 12px; color: var(--muted); letter-spacing: .08em; margin: 0 0 6px; }
+.hand { display: flex; flex-wrap: wrap; gap: 6px; min-height: 44px; }
+.chip {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 99px;
+  background: var(--surface); border: 1.5px solid var(--line); cursor: pointer; font: inherit; color: var(--fg);
+}
+.chip.sel { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
+.chip .tile { width: 22px; height: 22px; font-size: 11px; }
+.empty-hand { color: var(--muted); font-size: 13px; align-self: center; }
+.info { min-height: 46px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.info strong { font-weight: 700; }
+.info .stat { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 20;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); overflow-y: auto; }
+.modal { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.modal h2 { font-family: var(--f-display); font-weight: 400; font-size: 24px; margin: 0; text-wrap: balance; }
+.modal p { margin: 0; color: var(--muted); }
+.offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.offer { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); min-width: 0; }
+.offer-head { display: flex; align-items: center; gap: 8px; }
+.offer-head .tile { width: 26px; height: 26px; font-size: 12px; flex: none; }
+.offer-name { font-weight: 700; }
+.offer-desc { font-size: 12px; color: var(--muted); flex: 1; }
+.offer button { align-self: flex-start; }
+.offer.sold { opacity: .4; }
+.earn { font-family: var(--f-mono); font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+.earn span:nth-child(even) { text-align: right; color: var(--gold); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+details { font-size: 13px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--fg); font-weight: 500; }
+details ul { margin: 6px 0 0; padding-left: 18px; }
+.proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+@media (max-width: 420px) {
+  .offers { grid-template-columns: 1fr; }
+  .board { gap: 4px; }
+  .board-wrap { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-wrap.shake { animation: none; }
+  .float { animation-duration: .01s; }
+}
+</style>
+
+<div class="app">
+  <header>
+    <h1>LOOP</h1>
+    <div class="round-info">
+      <span id="roundLabel">ROUND 1/4</span>
+      <span id="bossTag" class="boss-tag" hidden></span>
+      <span class="coins" id="coinLabel">◎ 0</span>
+    </div>
+  </header>
+
+  <section class="meters" aria-label="ステータス">
+    <div class="meter">
+      <div class="meter-label"><span>熱量</span><b id="heatText">0 / 120</b></div>
+      <div class="bar" id="heatBar"><i></i></div>
+    </div>
+    <div class="meter">
+      <div class="meter-label"><span>ノイズ</span><b id="noiseText">0 / 40</b></div>
+      <div class="bar" id="noiseBar"><i></i></div>
+    </div>
+    <div class="passes" id="passes" aria-label="周回"></div>
+  </section>
+
+  <section class="board-wrap" id="boardWrap">
+    <div class="board" id="beatNums"></div>
+    <div class="board" id="board" style="margin-top:6px"></div>
+    <div class="preview" id="preview"></div>
+  </section>
+
+  <div class="controls">
+    <button class="btn" id="playBtn">▶ 演奏する</button>
+    <button class="btn ghost" id="fadeBtn" disabled>フェードアウト</button>
+    <button class="btn ghost small" id="speedBtn">速度 ×1</button>
+  </div>
+
+  <section>
+    <p class="panel-title">手持ちのタイル</p>
+    <div class="hand" id="hand"></div>
+  </section>
+
+  <div class="info" id="info"></div>
+
+  <details>
+    <summary>遊び方</summary>
+    <ul>
+      <li>手持ちのタイルを選び、盤面のマスに置きます。置いたタイルをタップすると手持ちに戻ります。</li>
+      <li>「演奏する」で8拍のループが4周再生されます。拍ごとにその列のタイルが鳴り、熱量がたまります。</li>
+      <li>同じ列（同じ拍）にタイルを重ねるほど倍率が上がります（1つ増えるごとに＋0.5倍）。</li>
+      <li>毎周ランダムに1列がスポットライト（熱量・ノイズとも×2）になります。</li>
+      <li>ノイズが40に達すると観客が帰ってしまい、ゲームオーバーです。</li>
+      <li>目標に届いたら「フェードアウト」で早めに終えると、残り周回ぶんのコインがもらえます。</li>
+    </ul>
+  </details>
+  <p class="proto">PROTOTYPE v0.1 — コアループ検証用</p>
+</div>
+
+<div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- constants ----------
+const STEPS = 8, ROWS = 4, PASSES = 4, NOISE_MAX = 40;
+const ROUNDS = [
+  { target: 150 },
+  { target: 400 },
+  { target: 850 },
+  { target: 1300, boss: { name: 'ボス：メトロノーム', desc: '偶数拍（2・4・6・8拍目）のタイルは熱量0。ノイズだけはたまる。' } },
+];
+const START_HAND = ['kick', 'kick', 'snare', 'hat', 'hat', 'bass'];
+
+// cat: drum | bass | harm | lead | fx    shape: circle | square | tri | diamond | ring
+const DEFS = {
+  kick:     { name: 'キック', g: 'キ', cat: 'drum', shape: 'circle', price: 2, desc: '熱量+5',
+              eval: () => ({ heat: 5 }) },
+  snare:    { name: 'スネア', g: 'ス', cat: 'drum', shape: 'circle', price: 2, desc: '熱量+3。同じ拍にキックがあれば+8',
+              eval: c => ({ heat: c.col.some(t => t.id === 'kick') ? 8 : 3 }) },
+  hat:      { name: 'ハット', g: 'ハ', cat: 'drum', shape: 'circle', price: 1, desc: '熱量+2。同じ段にある他のハット1つにつき+2',
+              eval: c => ({ heat: 2 + 2 * (c.rowTiles.filter(t => t.id === 'hat').length - 1) }) },
+  bass:     { name: 'ベース', g: 'ベ', cat: 'bass', shape: 'square', price: 3, desc: '熱量+3。同じ拍の他のタイル1つにつき+2',
+              eval: c => ({ heat: 3 + 2 * (c.col.length - 1) }) },
+  chord:    { name: '和音', g: '和', cat: 'harm', shape: 'tri', price: 4, desc: '熱量+2。この拍の倍率+1。ノイズ+1',
+              eval: () => ({ heat: 2, mult: 1, noise: 1 }) },
+  lead:     { name: 'リード', g: '旋', cat: 'lead', shape: 'diamond', price: 4, desc: '熱量+9。ノイズ+2',
+              eval: () => ({ heat: 9, noise: 2 }) },
+  cresc:    { name: 'クレッシェンド', g: '昇', cat: 'harm', shape: 'tri', price: 4, desc: '熱量+4×周回数（4周目で+16）。ノイズ+1',
+              eval: c => ({ heat: 4 * c.pass, noise: 1 }) },
+  echo:     { name: 'エコー', g: '響', cat: 'lead', shape: 'diamond', price: 5, desc: '熱量+3。ノイズ+1。毎周の終わりに右側の空きマスへ「残響」を置く（ラウンド終了で消える）',
+              eval: () => ({ heat: 3, noise: 1 }) },
+  shadow:   { name: '残響', g: '響', cat: 'lead', shape: 'diamond', price: 0, desc: 'エコーが残した音。熱量+3。ノイズ+1', temp: true,
+              eval: () => ({ heat: 3, noise: 1 }) },
+  ghost:    { name: 'ゴースト', g: '幽', cat: 'harm', shape: 'ring', price: 5, desc: '1周目は鳴らない。2周目から熱量+16。ノイズ+2',
+              eval: c => c.pass === 1 ? { silent: true } : { heat: 16, noise: 2 } },
+  rest:     { name: '休符', g: '休', cat: 'fx', shape: 'ring', price: 3, desc: 'ノイズ-4。倍率には数えない', quiet: true,
+              eval: () => ({ noise: -4, silent: true }) },
+  dist:     { name: 'ディストーション', g: '歪', cat: 'fx', shape: 'square', price: 5, desc: '熱量+20。ノイズ+6',
+              eval: () => ({ heat: 20, noise: 6 }) },
+  feedback: { name: 'フィードバック', g: '返', cat: 'fx', shape: 'circle', price: 5, desc: '熱量＋現在のノイズ。ノイズ+2',
+              eval: c => ({ heat: c.noise, noise: 2 }) },
+};
+const SHOP_POOL = ['kick', 'snare', 'hat', 'bass', 'chord', 'lead', 'cresc', 'echo', 'ghost', 'rest', 'dist', 'feedback'];
+
+// ---------- state ----------
+let S;
+let uid = 1;
+const mk = id => ({ id, uid: uid++ });
+function newRun() {
+  return {
+    round: 0, coins: 0, phase: 'build',
+    board: Array.from({ length: ROWS }, () => Array(STEPS).fill(null)),
+    hand: START_HAND.map(mk),
+    heat: 0, noise: 0, pass: 0, step: -1, spot: -1,
+    offers: [], selected: -1, speed: 1, lastGain: null,
+  };
+}
+
+// ---------- scoring ----------
+// Evaluates one beat column. Pure apart from reading board/noise; returns heat gained and noise delta.
+function evalColumn(board, step, pass, noiseNow, boss, spot) {
+  const col = [];
+  for (let r = 0; r < ROWS; r++) if (board[r][step]) col.push({ ...board[r][step], r });
+  let heat = 0, mult = 0, noise = noiseNow, sounding = 0;
+  const hits = [];
+  const ctxCol = col.filter(t => !DEFS[t.id].quiet && !(t.id === 'ghost' && pass === 1));
+  for (const t of col) {
+    const rowTiles = board[t.r].filter(Boolean);
+    const res = DEFS[t.id].eval({ col: ctxCol, rowTiles, pass, noise: Math.max(0, noise), step });
+    let h = res.heat || 0;
+    if (boss && step % 2 === 1) h = 0;
+    heat += h;
+    mult += res.mult || 0;
+    noise += res.noise || 0;
+    if (!res.silent) { sounding++; hits.push(t); }
+  }
+  const factor = 1 + 0.5 * Math.max(0, sounding - 1) + mult;
+  let gain = Math.round(heat * factor);
+  let dNoise = noise - noiseNow;
+  if (step === spot) { gain *= 2; if (dNoise > 0) dNoise *= 2; }
+  return { gain, dNoise, factor, hits, col };
+}
+
+// Deterministic estimate of pass 1 (no spotlight) for the build-phase preview.
+function previewPass(pass = 1) {
+  let heat = 0, noise = 0;
+  const boss = !!ROUNDS[S.round].boss;
+  for (let s = 0; s < STEPS; s++) {
+    const r = evalColumn(S.board, s, pass, noise, boss, -1);
+    heat += r.gain; noise = Math.max(0, noise + r.dNoise);
+  }
+  return { heat, noise };
+}
+
+// ---------- audio ----------
+let ac = null, master, shaper, noiseBuf;
+function ensureAudio() {
+  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  ac = new AC();
+  master = ac.createGain(); master.gain.value = .55;
+  shaper = ac.createWaveShaper(); setDrive(0);
+  const comp = ac.createDynamicsCompressor();
+  master.connect(shaper); shaper.connect(comp); comp.connect(ac.destination);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function setDrive(x) {
+  if (!shaper) return;
+  const k = x * 80, n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const v = i * 2 / n - 1; curve[i] = k ? (1 + k) * v / (1 + k * Math.abs(v)) : v; }
+  shaper.curve = curve;
+}
+function env(g, t, peak, dec, att = .002) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + att);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + att + dec);
+}
+function osc(type, f, t, peak, dec, att, filt) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  let node = o;
+  if (filt) { const bq = ac.createBiquadFilter(); bq.type = 'lowpass'; bq.frequency.value = filt; o.connect(bq); node = bq; }
+  node.connect(g); g.connect(master); env(g, t, peak, dec, att);
+  o.start(t); o.stop(t + (att || .002) + dec + .05);
+  return o;
+}
+function noise(t, type, freq, peak, dec) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = noiseBuf; f.type = type; f.frequency.value = freq;
+  s.connect(f); f.connect(g); g.connect(master); env(g, t, peak, dec);
+  s.start(t); s.stop(t + dec + .05);
+}
+const PENTA = [0, 3, 5, 7, 10];
+const PROG = [0, 0, 2, 2, 3, 3, 1, 4];
+function note(base, idx) { const o = Math.floor(idx / 5), d = PENTA[((idx % 5) + 5) % 5]; return base * Math.pow(2, o + d / 12); }
+function playTile(id, step, row, pass, t) {
+  const root = PROG[step];
+  switch (id) {
+    case 'kick': { const o = osc('sine', 150, t, .9, .26); o.frequency.exponentialRampToValueAtTime(42, t + .14); break; }
+    case 'snare': noise(t, 'bandpass', 1900, .5, .16); osc('triangle', 190, t, .25, .08); break;
+    case 'hat': noise(t, 'highpass', 7500, .22, .05); break;
+    case 'bass': osc('sawtooth', note(55, root), t, .32, .24, .004, 520); break;
+    case 'chord': [0, 2, 4].forEach(i => osc('triangle', note(220, root + i), t, .1, .45, .01)); break;
+    case 'lead': osc('square', note(440, root + (3 - row) * 2), t, .09, .2, .004, 2600); break;
+    case 'cresc': osc('sine', note(330, root + 2), t, .05 + .04 * pass, .35, .03); break;
+    case 'echo': osc('triangle', note(660, root + row), t, .12, .3); break;
+    case 'shadow': osc('triangle', note(660, root + row), t, .05, .3); break;
+    case 'ghost': osc('sine', note(880, root + 1), t, .1, .5, .08); break;
+    case 'dist': osc('sawtooth', note(110, root), t, .18, .28, .004, 1800); osc('sawtooth', note(110, root + 3), t, .14, .28, .004, 1800); break;
+    case 'feedback': osc('square', note(1760, root + row), t, .05, .12); break;
+  }
+}
+function sfx(kind) {
+  if (!ac) return;
+  const t = ac.currentTime + .02;
+  if (kind === 'clear') [0, 2, 4, 5, 7].forEach((i, k) => osc('triangle', note(440, i), t + k * .08, .12, .3));
+  if (kind === 'fail') { noise(t, 'lowpass', 900, .5, 1.1); const o = osc('sawtooth', 220, t, .2, 1.1, .01, 900); o.frequency.exponentialRampToValueAtTime(40, t + 1.1); }
+  if (kind === 'buy') osc('sine', 1320, t, .12, .12);
+}
+
+// ---------- rendering ----------
+const $ = id => document.getElementById(id);
+const boardEl = $('board');
+function tileHTML(id, extra = '') {
+  const d = DEFS[id];
+  const inner = d.shape === 'diamond' ? `<em>${d.g}</em>` : d.g;
+  return `<span class="tile shape-${d.shape} cat-${d.cat} ${d.temp ? 'shadow' : ''} ${extra}">${inner}</span>`;
+}
+function renderBeats() {
+  const boss = !!ROUNDS[S.round].boss;
+  $('beatNums').innerHTML = Array.from({ length: STEPS }, (_, s) =>
+    `<div class="beat-num ${boss && s % 2 === 1 ? 'off' : ''}">${s + 1}</div>`).join('');
+}
+function renderBoard() {
+  let html = '';
+  for (let r = 0; r < ROWS; r++) for (let s = 0; s < STEPS; s++) {
+    const t = S.board[r][s];
+    const canDrop = S.phase === 'build' && S.selected >= 0;
+    html += `<button class="cell ${canDrop ? 'target' : ''}" data-r="${r}" data-s="${s}" aria-label="${s + 1}拍目 ${r + 1}段 ${t ? DEFS[t.id].name : '空き'}">${t ? tileHTML(t.id) : ''}</button>`;
+  }
+  boardEl.innerHTML = html;
+  highlightColumn();
+}
+function colRect(s) {
+  const c = boardEl.querySelector(`.cell[data-r="0"][data-s="${s}"]`);
+  return c ? { left: c.offsetLeft, width: c.offsetWidth } : null;
+}
+function highlightColumn() {
+  boardEl.querySelectorAll('.col-bg, .spot-label').forEach(e => e.remove());
+  const add = (s, color, label) => {
+    const r = colRect(s); if (!r) return;
+    const bg = document.createElement('div');
+    bg.className = 'col-bg'; bg.style.left = (r.left - 3) + 'px'; bg.style.width = (r.width + 6) + 'px'; bg.style.background = color;
+    boardEl.prepend(bg);
+    if (label) { const l = document.createElement('div'); l.className = 'spot-label'; l.style.left = (r.left + r.width / 2) + 'px'; l.textContent = label; boardEl.appendChild(l); }
+  };
+  if (S.phase === 'play' && S.spot >= 0) add(S.spot, 'var(--spot)', '×2');
+  if (S.phase === 'play' && S.step >= 0) add(S.step, 'var(--playhead)');
+}
+function renderHand() {
+  const el = $('hand');
+  if (!S.hand.length) { el.innerHTML = '<span class="empty-hand">すべて盤面に置いています</span>'; return; }
+  el.innerHTML = S.hand.map((t, i) =>
+    `<button class="chip ${i === S.selected ? 'sel' : ''}" data-i="${i}">${tileHTML(t.id)}<span>${DEFS[t.id].name}</span></button>`).join('');
+}
+function renderInfo(id) {
+  const el = $('info');
+  if (id) { el.innerHTML = `<strong>${DEFS[id].name}</strong>　${DEFS[id].desc}`; return; }
+  if (S.phase === 'play') { el.innerHTML = `演奏中：${S.pass}周目 / ${PASSES}周`; return; }
+  el.innerHTML = S.selected >= 0
+    ? '置きたいマスを選んでください。'
+    : 'タイルを選んで盤面に置き、「演奏する」を押してください。';
+}
+function renderMeters() {
+  const R = ROUNDS[S.round];
+  $('roundLabel').textContent = `ROUND ${S.round + 1}/${ROUNDS.length}`;
+  $('coinLabel').textContent = `◎ ${S.coins}`;
+  const bt = $('bossTag'); bt.hidden = !R.boss; if (R.boss) bt.textContent = R.boss.name;
+  $('heatText').textContent = `${S.heat} / ${R.target}`;
+  $('heatBar').firstElementChild.style.width = Math.min(100, S.heat / R.target * 100) + '%';
+  $('noiseText').textContent = `${S.noise} / ${NOISE_MAX}`;
+  $('noiseBar').firstElementChild.style.width = Math.min(100, S.noise / NOISE_MAX * 100) + '%';
+  $('passes').innerHTML = '<span style="border:0;width:auto;height:auto">周回</span>' + Array.from({ length: PASSES }, (_, i) => {
+    const p = i + 1;
+    const cls = S.phase !== 'play' ? '' : p < S.pass ? 'done' : p === S.pass ? 'now' : '';
+    return `<span class="${cls}"></span>`;
+  }).join('');
+  $('boardWrap').classList.toggle('shake', S.phase === 'play' && S.noise >= NOISE_MAX * .75);
+  const pv = $('preview');
+  if (S.phase === 'build') {
+    const p1 = previewPass(1), p4 = previewPass(4);
+    pv.innerHTML = `<span>1周目の目安 熱量 <b>${p1.heat}</b>・ノイズ <b>+${p1.noise}</b></span><span>4周目の目安 熱量 <b>${p4.heat}</b></span>`;
+  } else pv.innerHTML = `<span>スポットライト（×2）の列は毎周変わります</span>`;
+  $('playBtn').disabled = S.phase !== 'build';
+  $('fadeBtn').disabled = S.phase !== 'play';
+  $('speedBtn').textContent = `速度 ×${S.speed}`;
+}
+function render() { renderBeats(); renderBoard(); renderHand(); renderMeters(); renderInfo(); }
+
+function floatText(s, text, cls = '') {
+  const r = colRect(s); if (!r) return;
+  const f = document.createElement('div');
+  f.className = 'float ' + cls; f.textContent = text; f.style.left = Math.max(28, Math.min(boardEl.clientWidth - 28, r.left + r.width / 2)) + 'px';
+  boardEl.appendChild(f); setTimeout(() => f.remove(), 850);
+}
+
+// ---------- input ----------
+boardEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell'); if (!c || S.phase !== 'build') return;
+  const r = +c.dataset.r, s = +c.dataset.s, cur = S.board[r][s];
+  ensureAudio();
+  if (S.selected >= 0) {
+    const t = S.hand.splice(S.selected, 1)[0];
+    S.board[r][s] = t;
+    if (cur) S.hand.push(cur);
+    S.selected = -1;
+    if (ac) playTile(t.id, s, r, 1, ac.currentTime + .01);
+  } else if (cur) {
+    S.board[r][s] = null; S.hand.push(cur);
+  }
+  render();
+});
+boardEl.addEventListener('mouseover', e => {
+  const c = e.target.closest('.cell'); if (!c) return;
+  const t = S.board[+c.dataset.r][+c.dataset.s]; if (t) renderInfo(t.id);
+});
+boardEl.addEventListener('mouseleave', () => renderInfo());
+$('hand').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c || S.phase !== 'build') return;
+  const i = +c.dataset.i;
+  S.selected = S.selected === i ? -1 : i;
+  renderHand(); renderBoard();
+  if (S.selected >= 0) renderInfo(S.hand[i].id); else renderInfo();
+});
+$('playBtn').addEventListener('click', () => { ensureAudio(); startRound(); });
+$('fadeBtn').addEventListener('click', () => { if (S.phase === 'play') finish(true); });
+$('speedBtn').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : S.speed === 2 ? 3 : 1; renderMeters(); });
+
+// ---------- round flow ----------
+let timer = null;
+function startRound() {
+  if (S.phase !== 'build') return;
+  S.phase = 'play'; S.heat = 0; S.noise = 0; S.pass = 1; S.step = -1; S.selected = -1;
+  S.spot = Math.floor(Math.random() * STEPS);
+  setDrive(0);
+  render();
+  timer = setTimeout(tick, 250);
+}
+function tick() {
+  if (S.phase !== 'play') return;
+  S.step++;
+  if (S.step >= STEPS) {
+    // end of pass: echoes leave shadows
+    for (let r = 0; r < ROWS; r++) for (let s = STEPS - 1; s >= 0; s--) {
+      const t = S.board[r][s];
+      if (t && t.id === 'echo') {
+        for (let x = s + 1; x < STEPS; x++) if (!S.board[r][x]) { S.board[r][x] = mk('shadow'); break; }
+      }
+    }
+    if (S.pass >= PASSES) { finish(false); return; }
+    S.pass++; S.step = 0;
+    S.spot = Math.floor(Math.random() * STEPS);
+    renderBoard();
+  }
+  const boss = !!ROUNDS[S.round].boss;
+  const res = evalColumn(S.board, S.step, S.pass, S.noise, boss, S.spot);
+  S.heat += res.gain;
+  S.noise = Math.max(0, S.noise + res.dNoise);
+  if (ac) {
+    const t = ac.currentTime + .01;
+    for (const h of res.hits) playTile(h.id, S.step, h.r, S.pass, t);
+    setDrive(Math.min(1, S.noise / NOISE_MAX) * .9);
+  }
+  highlightColumn();
+  boardEl.querySelectorAll('.cell.hit').forEach(c => c.classList.remove('hit'));
+  for (const h of res.hits) boardEl.querySelector(`.cell[data-r="${h.r}"][data-s="${S.step}"]`)?.classList.add('hit');
+  if (res.gain) floatText(S.step, `+${res.gain}${res.factor > 1 ? ` ×${+res.factor.toFixed(1)}` : ''}`);
+  if (res.dNoise) floatText(S.step, `${res.dNoise > 0 ? 'ノイズ+' : 'ノイズ'}${res.dNoise}`, 'n');
+  renderMeters(); renderInfo();
+  if (S.noise >= NOISE_MAX) { fail('ノイズが限界を超え、観客が帰ってしまいました。'); return; }
+  timer = setTimeout(tick, Math.round(300 / S.speed));
+}
+function clearShadows() {
+  for (let r = 0; r < ROWS; r++) for (let s = 0; s < STEPS; s++) if (S.board[r][s]?.id === 'shadow') S.board[r][s] = null;
+}
+function finish(faded) {
+  clearTimeout(timer);
+  const R = ROUNDS[S.round];
+  const remaining = faded ? PASSES - S.pass : 0;
+  clearShadows(); setDrive(0);
+  if (S.heat < R.target) {
+    fail(faded ? `熱量 ${S.heat} で終えました。目標の ${R.target} に届きませんでした。` : `熱量 ${S.heat}。目標の ${R.target} に届きませんでした。`);
+    return;
+  }
+  const base = 4, fadeBonus = remaining * 2, over = Math.min(3, Math.floor((S.heat / R.target - 1) * 4));
+  const earned = base + fadeBonus + over;
+  S.coins += earned;
+  sfx('clear');
+  if (S.round === ROUNDS.length - 1) { S.phase = 'win'; render(); showWin(); return; }
+  S.phase = 'shop';
+  S.offers = rollOffers();
+  S.lastGain = { base, fadeBonus, over, earned, remaining };
+  render(); showShop();
+}
+function fail(msg) {
+  clearTimeout(timer); clearShadows(); setDrive(0);
+  S.phase = 'over'; sfx('fail'); render();
+  showModal(`<h2>演奏失敗</h2><p>${msg}</p><p>到達：ROUND ${S.round + 1}</p>
+    <div class="row"><span></span><button class="btn" id="retry">最初から</button></div>`);
+  $('retry').onclick = () => { hideModal(); S = newRun(); render(); };
+}
+function rollOffers() {
+  const out = [];
+  for (let i = 0; i < 4; i++) out.push({ id: SHOP_POOL[Math.floor(Math.random() * SHOP_POOL.length)], sold: false });
+  return out;
+}
+
+// ---------- modals ----------
+function showModal(html) { $('modal').innerHTML = html; $('overlay').hidden = false; }
+function hideModal() { $('overlay').hidden = true; }
+function showShop() {
+  const g = S.lastGain, R = ROUNDS[S.round];
+  const next = ROUNDS[S.round + 1];
+  showModal(`
+    <h2>ROUND ${S.round + 1} クリア</h2>
+    <div class="earn">
+      <span>クリア報酬</span><span>+${g.base}</span>
+      <span>フェードアウト（残り${g.remaining}周）</span><span>+${g.fadeBonus}</span>
+      <span>目標超過（熱量 ${S.heat} / ${R.target}）</span><span>+${g.over}</span>
+      <span><b>所持コイン</b></span><span><b>◎ ${S.coins}</b></span>
+    </div>
+    <p>次の目標：熱量 ${next.target}${next.boss ? `　<b style="color:var(--noise)">${next.boss.name}</b> ${next.boss.desc}` : ''}</p>
+    <div class="offers" id="offers">${S.offers.map((o, i) => `
+      <div class="offer ${o.sold ? 'sold' : ''}">
+        <div class="offer-head">${tileHTML(o.id)}<span class="offer-name">${DEFS[o.id].name}</span></div>
+        <div class="offer-desc">${DEFS[o.id].desc}</div>
+        <button class="btn small ${S.coins < DEFS[o.id].price || o.sold ? 'ghost' : ''}" data-buy="${i}" ${o.sold || S.coins < DEFS[o.id].price ? 'disabled' : ''}>${o.sold ? '購入済み' : `◎ ${DEFS[o.id].price} で買う`}</button>
+      </div>`).join('')}
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="reroll" ${S.coins < 1 ? 'disabled' : ''}>入れ替える ◎1</button>
+      <button class="btn" id="nextRound">次のラウンドへ</button>
+    </div>`);
+  $('offers').onclick = e => {
+    const b = e.target.closest('[data-buy]'); if (!b) return;
+    const o = S.offers[+b.dataset.buy], p = DEFS[o.id].price;
+    if (o.sold || S.coins < p) return;
+    S.coins -= p; o.sold = true; S.hand.push(mk(o.id)); sfx('buy');
+    renderMeters(); renderHand(); showShop();
+  };
+  $('reroll').onclick = () => { if (S.coins < 1) return; S.coins -= 1; S.offers = rollOffers(); renderMeters(); showShop(); };
+  $('nextRound').onclick = () => {
+    hideModal(); S.round++; S.phase = 'build'; S.heat = 0; S.noise = 0; S.step = -1; S.spot = -1; render();
+  };
+}
+function showWin() {
+  showModal(`<h2>全ラウンドクリア</h2>
+    <p>最終ラウンドの熱量：${S.heat}。試作版はここまでです。</p>
+    <p>遊んでみて「もう1回」と思えたか、どのタイルの組み合わせが楽しかったかを教えてください。</p>
+    <div class="row"><span></span><button class="btn" id="again">もう一度遊ぶ</button></div>`);
+  $('again').onclick = () => { hideModal(); S = newRun(); render(); };
+}
+
+// ---------- boot ----------
+function start(data) {
+  S = newRun();
+  if (data && data.S && data.S.phase === 'build') { S = data.S; uid = data.uid || 1000; }
+  render();
+}
+try { window.claude?.hot?.snapshot?.(() => ({ S: S && S.phase === 'build' ? S : null, uid })); } catch (e) {}
+window.addEventListener('resize', () => highlightColumn());
+window.__loop = { get S() { return S; }, evalColumn, previewPass, DEFS, ROUNDS };
+if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+})();
+</script>
