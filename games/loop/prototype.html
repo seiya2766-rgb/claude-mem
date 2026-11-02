@@ -166,6 +166,19 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
 .offer .price { font-family: var(--f-mono); color: var(--gold); font-weight: 600; font-size: 13px; }
 .offer:disabled { opacity: .4; cursor: default; }
 .coins { color: var(--gold); font-weight: 600; }
+canvas#field.hurt { animation: hurt .25s linear; }
+@keyframes hurt { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-3px,1px); } 40% { transform: translate(3px,-1px); } 60% { transform: translate(-2px,0); } 80% { transform: translate(2px,1px); } }
+@media (prefers-reduced-motion: reduce) { canvas#field.hurt { animation: none; } }
+.stats { font-family: var(--f-mono); font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; }
+.stats span:nth-child(even) { text-align: right; color: var(--fg); font-weight: 600; }
+.stats span:nth-child(odd) { color: var(--muted); font-family: var(--f-body); }
+.kit-tiles { display: flex; gap: 4px; flex-wrap: wrap; }
+.kit-tiles .tile { width: 22px; height: 22px; font-size: 11px; flex: none; }
+.kit-tiles .tile.shape-tri, .chip .tile.shape-tri, .offer-head .tile.shape-tri { padding-bottom: 1px; font-size: 9px; max-height: 26px; }
+.ranks { display: flex; gap: 6px; flex-wrap: wrap; }
+.ranks button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.offer[aria-pressed="true"] { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
+.unlock { color: var(--gold); font-weight: 700; }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
 @media (max-width: 460px) {
   .offers, .offers.two { grid-template-columns: 1fr; }
@@ -236,9 +249,10 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
       <li>戦闘に勝つとタイル1つとコインがもらえます。次の行き先は「通常戦・強敵・ショップ・休憩」から選びます。9マス目がボスです。</li>
       <li>強敵に勝つと装置（ずっと効く効果）も選べます。ショップではコインでタイルや装置を買えます。</li>
       <li>同じタイル同士を重ねると強化（＋）されます。休憩所でも1枚強化できます。</li>
+      <li>開始時に楽器セット（最初の手持ちと特性）とランク（難易度）を選びます。ボスを倒すと次のランクが解放されます。</li>
     </ul>
   </details>
-  <p class="proto">PROTOTYPE v0.4 — ルート選択・ショップ・タイル強化</p>
+  <p class="proto">PROTOTYPE v0.5 — 楽器セット・ランク・リザルト</p>
 </div>
 
 <div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
@@ -272,9 +286,9 @@ const ENEMIES = {
   stealth: { hp: 4,   speed: .1,   dmg: 1, armor: 0, r: 7,  shape: 'circle', stealth: true, name: 'ステルス', desc: 'ハットかシンバルが当たるまで他の攻撃が当たらない' },
   split:   { hp: 6,   speed: .07,  dmg: 2, armor: 0, r: 9,  shape: 'split',  name: 'スプリット', desc: '倒すとミニ2体に分かれる' },
   mini:    { hp: 2,   speed: .09,  dmg: 1, armor: 0, r: 5,  shape: 'circle', name: 'ミニ', desc: '小さい敵' },
-  boss:    { hp: 300, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex',    name: 'テンポ泥棒', desc: 'レーンを移り、拍を封印し、ミニを呼ぶ' },
+  boss:    { hp: 260, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex',    name: 'テンポ泥棒', desc: 'レーンを移り、拍を封印し、ミニを呼ぶ' },
 };
-const tempoMax = () => (G && G.relics.metronome) ? 5 : 3;
+const tempoMax = () => (G && G.relics.metronome ? 5 : 3) + (G && G.kit === 'rhythm' ? 1 : 0);
 
 function wave(list, type, count, start, interval, lanes) {
   for (let i = 0; i < count; i++) list.push({ t: start + i * interval, type, lanes });
@@ -310,7 +324,7 @@ const NODES = {
   battle: { name: '通常戦', desc: '勝つとタイル1つとコイン5' },
   elite:  { name: '強敵', desc: '敵が多く硬い。勝つとタイル、コイン9、装置' },
   shop:   { name: 'ショップ', desc: 'コインでタイルや装置を買う' },
-  rest:   { name: '休憩', desc: 'ライフを4回復するか、タイルを1枚強化する' },
+  rest:   { name: '休憩', desc: 'ライフを回復するか、タイルを1枚強化する' },
   boss:   { name: 'ボス', desc: 'テンポ泥棒。拍を封印してくる' },
 };
 function makeColumn(c) {
@@ -378,7 +392,14 @@ const DEFS = {
            fire: () => {} },
 };
 const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest'];
-const START_HAND = ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'];
+const KITS = {
+  rhythm:  { name: 'リズム隊', hand: ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'], life: 10, desc: '打楽器中心の安定型。置き直しポイントの最大+1' },
+  harmony: { name: 'ハーモニー', hand: ['chord', 'lead', 'lead', 'bass', 'bass', 'hat'], life: 10, desc: '和音とリードでまとめて削る。和音のノイズが0' },
+  noise:   { name: 'ノイズ', hand: ['dist', 'feedback', 'kick', 'hat', 'rest', 'snare'], life: 8, desc: '高火力だが不安定。ノイズ上限+10、ライフ8' },
+};
+const RANKS = ['基本', '敵の体力+20%', '休憩の回復が4→2', '敵の速さ+10%', '最初のライフ-2', 'ボスの体力+30%'];
+function loadRank() { try { return Math.min(RANKS.length - 1, parseInt(localStorage.getItem('loop.rank') || '0', 10) || 0); } catch (e) { return 0; } }
+function saveRank(r) { try { localStorage.setItem('loop.rank', String(r)); } catch (e) {} }
 
 // ================= state =================
 let uid = 1;
@@ -393,11 +414,14 @@ function lvNote(id) {
 }
 const canMerge = (a, b) => a && b && a !== b && a.id === b.id && a.lv === 1 && b.lv === 1;
 let G;
-function newGame() {
+function newGame(kit = 'rhythm', rank = 0) {
+  const maxLife = KITS[kit].life - (rank >= 4 ? 2 : 0);
   return {
-    col: 0, node: 'battle', coins: 0, life: MAX_LIFE, relics: {},
+    kit, rank, maxLife,
+    stats: { kills: 0, dmg: 0, maxHit: 0, overheats: 0, coins: 0, battles: 0 },
+    col: 0, node: 'battle', coins: 0, life: maxLife, relics: {},
     board: Array.from({ length: LANES }, () => Array(STEPS).fill(null)),
-    hand: START_HAND.map(mk),
+    hand: KITS[kit].hand.map(mk),
     phase: 'build', listening: false, speed: 1,
     selHand: -1, selCell: null,
     root: 9, scale: 'dark',
@@ -410,7 +434,7 @@ function freshStage() {
            enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
            muted: -1, mutedLeft: 0, hits: [], tempo: tempoMax() };
 }
-const noiseMax = () => G.relics.gate ? 42 : 30;
+const noiseMax = () => (G.relics.gate ? 42 : 30) + (G.kit === 'noise' ? 10 : 0);
 
 // ================= audio =================
 let ac = null, master, shaper, noiseBuf;
@@ -522,6 +546,7 @@ function damage(e, amount, color, src) {
   }
   const d = Math.max(1, Math.round(amount) - e.armor);
   e.hp -= d; e.flash = .12;
+  G.stats.dmg += d; G.stats.maxHit = Math.max(G.stats.maxHit, d); if (e.hp <= 0) G.stats.kills++;
   G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
   G.texts.push({ lane: e.lane, x: e.x, txt: String(d), life: .6 });
   if (e.hp <= 0) {
@@ -543,7 +568,8 @@ function makeCtx(lane, step, mul, color, src, lv = 1) {
 }
 function spawn(type, lane, x = 1) {
   const T = ENEMIES[type];
-  G.enemies.push({ type, lane, x, revealed: false, hp: T.hp, max: T.hp, speed: T.speed, dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
+  const hp = Math.round(T.hp * (G.rank >= 1 ? 1.2 : 1) * (type === 'boss' && G.rank >= 5 ? 1.3 : 1));
+  G.enemies.push({ type, lane, x, revealed: false, hp, max: hp, speed: T.speed * (G.rank >= 3 ? 1.1 : 1), dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
 }
 function startStage() {
   Object.assign(G, freshStage());
@@ -586,12 +612,12 @@ function doStep() {
     const lvMul = c.t.lv === 2 && !['cymbal', 'bass', 'chord', 'rest'].includes(c.t.id) ? 1.6 : 1;
     const mul = mulBase * lvMul * (c.t.id === 'chord' ? 1 : chordMul);
     if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, c.t.id === 'bass' && c.t.lv === 2 ? mul * 1.6 : mul, d.cat, c.t.id, c.t.lv));
-    const dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : d.noise;
+    const dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : (c.t.id === 'chord' && G.kit === 'harmony') ? 0 : d.noise;
     G.noise = Math.max(0, G.noise + (G.phase === 'play' ? dn : 0));
     if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
   }
   if (G.phase === 'play' && G.noise >= noiseMax()) {
-    G.overheat = G.relics.limiter ? OVERHEAT_STEPS / 2 : OVERHEAT_STEPS; sfx('over');
+    G.overheat = G.relics.limiter ? OVERHEAT_STEPS / 2 : OVERHEAT_STEPS; sfx('over'); G.stats.overheats++;
   }
   setDrive(G.phase === 'play' ? Math.min(1, G.noise / noiseMax()) * .85 : 0);
   stepUI();
@@ -619,6 +645,7 @@ function update(dt) {
     if (e.x <= 0) {
       e.hp = 0; G.life -= e.dmg; sfx('hurt');
       G.fx.push({ kind: 'hurt', lane: e.lane, life: .4, max: .4 });
+      cv.classList.remove('hurt'); void cv.offsetWidth; cv.classList.add('hurt');
       renderStatus();
     }
   }
@@ -794,7 +821,7 @@ function renderLegend() {
 }
 function renderStatus() {
   renderTempo(); renderLegend();
-  $('stageLabel').textContent = `${G.col + 1}/${ROUTE_LEN}　${nodeLabel()}`;
+  $('stageLabel').textContent = `${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
   $('coinLabel').textContent = `◎ ${G.coins}`;
   $('lifeLabel').textContent = `♥ ${Math.max(0, G.life)}`;
   const rel = Object.keys(G.relics);
@@ -986,7 +1013,8 @@ function stageClear() {
   if (G.node === 'boss') return showWin();
   const elite = G.node === 'elite';
   const coins = elite ? 9 : 5; G.coins += coins;
-  const heal = Math.min(1, MAX_LIFE - G.life); G.life += heal;
+  const heal = Math.min(1, G.maxLife - G.life); G.life += heal;
+  G.stats.coins += coins; G.stats.battles++;
   const offers = pick(REWARD_POOL, 3);
   renderStatus();
   showModal(`<h2>${nodeLabel()} 勝利</h2>
@@ -1061,12 +1089,12 @@ function showRest() {
   const all = [...G.hand, ...G.board.flat().filter(Boolean)].filter(t => t.lv === 1);
   showModal(`<h2>休憩</h2><p>どちらか1つを選んでください。</p>
     <div class="offers two" id="offers">
-      <button class="offer" data-a="heal"><span class="offer-name">休む</span><span class="offer-desc">ライフを4回復（現在 ♥ ${G.life}）</span></button>
+      <button class="offer" data-a="heal"><span class="offer-name">休む</span><span class="offer-desc">ライフを${G.rank >= 2 ? 2 : 4}回復（現在 ♥ ${G.life}）</span></button>
       <button class="offer" data-a="up" ${all.length ? '' : 'disabled'}><span class="offer-name">練習</span><span class="offer-desc">タイルを1枚選んで強化する</span></button>
     </div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('button.offer'); if (!b || b.disabled) return;
-    if (b.dataset.a === 'heal') { G.life = Math.min(MAX_LIFE, G.life + 4); sfx('pick'); renderStatus(); chooseNext(); return; }
+    if (b.dataset.a === 'heal') { G.life = Math.min(G.maxLife, G.life + (G.rank >= 2 ? 2 : 4)); sfx('pick'); renderStatus(); chooseNext(); return; }
     showModal(`<h2>強化するタイル</h2><p>強化したタイルは名前に「＋」が付きます。</p>
       <div class="hand" id="upList">${all.map((t, i) => `<button class="chip" data-u="${i}" title="${lvNote(t.id)}">${tileHTML(t.id)}<span>${tName(t)}</span></button>`).join('')}</div>`);
     $('upList').onclick = ev => {
@@ -1075,22 +1103,58 @@ function showRest() {
     };
   };
 }
+function statsHTML() {
+  const st = G.stats;
+  return `<div class="stats">
+    <span>到達</span><span>${G.col + 1}/${ROUTE_LEN}</span>
+    <span>勝った戦闘</span><span>${st.battles}</span>
+    <span>倒した敵</span><span>${st.kills}</span>
+    <span>与えたダメージ</span><span>${st.dmg}</span>
+    <span>最大の一撃</span><span>${st.maxHit}</span>
+    <span>オーバーヒート</span><span>${st.overheats}回</span>
+    <span>集めたコイン</span><span>${st.coins}</span>
+  </div>`;
+}
 function gameOver() {
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll();
-  showModal(`<h2>スピーカーが壊れた</h2><p>${G.col + 1}/${ROUTE_LEN}（${nodeLabel()}）で力尽きました。</p>
-    <div class="row"><span></span><button class="btn" id="retry">最初から</button></div>`);
-  $('retry').onclick = () => { hideModal(); keepKey(() => { G = newGame(); }); renderAll(); };
+  showModal(`<h2>スピーカーが壊れた</h2><p>${KITS[G.kit].name}・ランク${G.rank}（${RANKS[G.rank]}）で挑戦しました。</p>${statsHTML()}
+    <div class="row"><button class="btn ghost" id="listenEnd">♪ 最後の盤面を聴く</button><button class="btn" id="retry">もう一度</button></div>`);
+  $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
+  $('retry').onclick = () => showStart();
 }
 function showWin() {
   G.phase = 'win'; renderAll();
-  showModal(`<h2>全ステージクリア</h2>
-    <p>ボスを倒しました。試作版はここまでです。最後の盤面があなたの曲です。</p>
-    <p>遊んでみて「もう1回」と思えたか、音づくりが邪魔にならなかったかを教えてください。</p>
+  let unlock = '';
+  const best = loadRank();
+  if (G.rank >= best && best < RANKS.length - 1) { saveRank(best + 1); unlock = `<p class="unlock">ランク${best + 1}（${RANKS[best + 1]}）が解放されました</p>`; }
+  showModal(`<h2>ボス撃破</h2>
+    <p>${KITS[G.kit].name}・ランク${G.rank}でクリアしました。最後の盤面があなたの曲です。</p>${unlock}${statsHTML()}
     <div class="row"><button class="btn ghost" id="listenEnd">♪ 曲を聴く</button><button class="btn" id="again">もう一度遊ぶ</button></div>`);
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.listening = true; G.step = -1; renderAll(); };
-  $('again').onclick = () => { hideModal(); keepKey(() => { G = newGame(); }); renderAll(); };
+  $('again').onclick = () => showStart();
 }
-function keepKey(fn) { const r = G.root, s = G.scale, sp = G.speed; fn(); G.root = r; G.scale = s; G.speed = sp; }
+function showStart() {
+  let kit = G ? G.kit : 'rhythm', rank = G ? Math.min(G.rank, loadRank()) : 0;
+  const draw = () => {
+    const maxRank = loadRank();
+    showModal(`<h2>LOOP</h2><p>楽器セットとランクを選んでください。</p>
+      <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => `
+        <button class="offer" data-kit="${k}" aria-pressed="${k === kit}">
+          <span class="offer-name">${v.name}</span>
+          <span class="kit-tiles">${v.hand.map(id => tileHTML(id)).join('')}</span>
+          <span class="offer-desc">${v.desc}</span></button>`).join('')}</div>
+      <div><p class="panel-title">ランク（ボスを倒すと次が解放）</p>
+        <div class="ranks" id="ranks">${RANKS.map((r, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
+        <p class="hint" style="margin-top:6px">ランク${rank}：${rank ? RANKS.slice(1, rank + 1).join('、') : '追加の制限なし'}</p></div>
+      <div class="row"><span></span><button class="btn" id="go">はじめる</button></div>`);
+    $('kits').onclick = e => { const b = e.target.closest('[data-kit]'); if (b) { kit = b.dataset.kit; draw(); } };
+    $('ranks').onclick = e => { const b = e.target.closest('[data-r]'); if (b && !b.disabled) { rank = +b.dataset.r; draw(); } };
+    $('go').onclick = () => { ensureAudio(); hideModal(); keepKey(() => { G = newGame(kit, rank); }); renderAll(); };
+  };
+  if (G) { G.phase = 'menu'; G.listening = false; renderAll(); }
+  draw();
+}
+function keepKey(fn) { const r = G ? G.root : 9, sc = G ? G.scale : 'dark', sp = G ? G.speed : 1; fn(); G.root = r; G.scale = sc; G.speed = sp; }
 
 // ================= main loop =================
 let last = performance.now();
@@ -1106,6 +1170,7 @@ function frame(now) {
 G = newGame();
 fillSelects();
 renderAll();
+showStart();
 window.__g = { get G() { return G; }, DEFS, startStage, doStep, update, makePlan, enterNode };
 requestAnimationFrame(frame);
 })();
