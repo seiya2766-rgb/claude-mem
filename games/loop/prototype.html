@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: one narrow column like a hardware sequencer — status on top, the 4x8 grid as the instrument, hand + controls below. */
+/* Layout: one narrow column — status, the lane field where enemies approach, then the 4x8 sequencer that defends those lanes, then hand + sound settings. */
 :root {
   --bg: #e9ecf1;
   --surface: #f8f9fb;
@@ -12,7 +12,7 @@
   --fg: #1a1e29;
   --muted: #687085;
   --line: #cdd2dc;
-  --heat: #e2643c;
+  --life: #d6455a;
   --noise: #c93a57;
   --gold: #b9861c;
   --drum: #2f69d6;
@@ -20,8 +20,8 @@
   --harm: #8656d2;
   --lead: #d9831a;
   --fx: #5d6679;
-  --playhead: rgba(47, 105, 214, .12);
-  --spot: rgba(217, 131, 26, .18);
+  --enemy: #1a1e29;
+  --playhead: #2f69d6;
   --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
   --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
@@ -29,17 +29,17 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
-    --heat: #f07a52; --noise: #e45773; --gold: #e0ad45;
+    --life: #ef6178; --noise: #e45773; --gold: #e0ad45;
     --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
-    --playhead: rgba(91, 142, 240, .16); --spot: rgba(240, 162, 64, .2);
+    --enemy: #e7eaf1; --playhead: #5b8ef0;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
-  --heat: #f07a52; --noise: #e45773; --gold: #e0ad45;
+  --life: #ef6178; --noise: #e45773; --gold: #e0ad45;
   --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
-  --playhead: rgba(91, 142, 240, .16); --spot: rgba(240, 162, 64, .2);
+  --enemy: #e7eaf1; --playhead: #5b8ef0;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -47,88 +47,83 @@
 body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.55; }
 .app {
   max-width: 680px; margin: 0 auto;
-  padding-block: 20px 40px;
+  padding-block: 18px 40px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; flex-direction: column; gap: 16px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { font-family: var(--f-display); font-weight: 400; font-size: 34px; letter-spacing: .08em; margin: 0; line-height: 1; }
-.round-info { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.boss-tag { font-family: var(--f-body); font-weight: 700; font-size: 12px; color: var(--noise); border: 1.5px solid var(--noise); padding: 1px 8px; border-radius: 99px; }
-.coins { color: var(--gold); font-weight: 600; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: 32px; letter-spacing: .08em; margin: 0; line-height: 1; }
+.status { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.status .life { color: var(--life); font-weight: 600; }
+.relics { display: flex; gap: 6px; flex-wrap: wrap; }
+.relic { font-size: 12px; border: 1.5px solid var(--gold); color: var(--gold); border-radius: 99px; padding: 0 8px; font-weight: 700; }
 
-.meters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.meter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.meter { display: flex; flex-direction: column; gap: 4px; }
 .meter-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
 .meter-label b { font-family: var(--f-mono); color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
-.bar { height: 10px; background: var(--cell); border-radius: 5px; overflow: hidden; position: relative; }
-.bar > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--heat); border-radius: 5px; transition: width .18s ease-out; }
-#noiseBar > i { background: var(--noise); }
-.passes { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
-.passes span { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); }
-.passes span.done { background: var(--fg); border-color: var(--fg); }
-.passes span.now { border-color: var(--heat); background: var(--heat); }
+.bar { height: 8px; background: var(--cell); border-radius: 4px; overflow: hidden; position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--noise); border-radius: 4px; transition: width .15s ease-out; }
+.bar.hot > i { animation: blink .3s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
 
-.board-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; position: relative; }
-.board-wrap.shake { animation: shake .12s linear infinite; }
-@keyframes shake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(1px,-1px); } 75% { transform: translate(-1px,1px); } }
-.board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; position: relative; }
-.beat-num { text-align: center; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
-.beat-num.off { opacity: .45; }
-.col-bg { position: absolute; top: 0; bottom: 0; border-radius: 8px; pointer-events: none; transition: background .08s; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+canvas#field { width: 100%; height: 168px; display: block; border-radius: 8px; background: var(--bg); }
+.board { display: grid; grid-template-columns: 16px repeat(8, minmax(0, 1fr)); gap: 5px; }
+.lane-num, .beat-num { font-family: var(--f-mono); font-size: 11px; color: var(--muted); display: grid; place-items: center; }
 .cell {
   aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--cell); border: none; padding: 0;
   display: grid; place-items: center; cursor: pointer; position: relative; color: var(--fg); font: inherit;
+  transition: box-shadow .06s;
 }
-.cell:focus-visible, .chip:focus-visible, button:focus-visible { outline: 2px solid var(--drum); outline-offset: 2px; }
-.cell.target { box-shadow: inset 0 0 0 2px var(--drum); }
-.cell.hit .tile { transform: scale(1.18); }
-.tile { width: 74%; height: 74%; display: grid; place-items: center; font-weight: 700; font-size: clamp(11px, 3.2vw, 16px); color: #fff; line-height: 1; overflow: hidden; transition: transform .1s ease-out; position: relative; }
-.tile.shadow { opacity: .45; }
+.cell:focus-visible, .chip:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--drum); outline-offset: 2px; }
+.cell.ph { box-shadow: inset 0 0 0 2px var(--playhead); }
+.cell.muted { opacity: .35; }
+.cell.target { box-shadow: inset 0 0 0 1.5px var(--muted); }
+.cell.selc { box-shadow: inset 0 0 0 2.5px var(--fg); }
+.cell.hit .tile { transform: scale(1.2); }
+.cell.custom::after { content: "♪"; position: absolute; right: 2px; top: 0; font-size: 10px; color: var(--muted); }
+.board.over .cell { filter: grayscale(1); opacity: .5; }
+.tile { width: 72%; height: 72%; display: grid; place-items: center; font-weight: 700; font-size: clamp(11px, 3.1vw, 15px); color: #fff; line-height: 1; overflow: hidden; transition: transform .1s ease-out; position: relative; }
 .shape-circle { border-radius: 50%; }
 .shape-square { border-radius: 4px; }
-.shape-diamond { border-radius: 4px; transform: rotate(45deg) scale(.82); }
+.shape-diamond { border-radius: 4px; transform: rotate(45deg) scale(.82); overflow: visible; }
 .shape-diamond > em { transform: rotate(-45deg); font-style: normal; }
 .cell.hit .shape-diamond { transform: rotate(45deg) scale(1); }
 .shape-tri { clip-path: polygon(50% 4%, 100% 92%, 0 92%); align-content: end; padding-bottom: 12%; }
 .shape-ring { border-radius: 50%; background: transparent !important; border: 3px solid currentColor; }
-.cat-drum { background: var(--drum); }
-.cat-bass { background: var(--bass); }
-.cat-harm { background: var(--harm); }
-.cat-lead { background: var(--lead); }
-.cat-fx { background: var(--fx); }
+.cat-drum { background: var(--drum); } .cat-bass { background: var(--bass); } .cat-harm { background: var(--harm); }
+.cat-lead { background: var(--lead); } .cat-fx { background: var(--fx); }
 .shape-ring.cat-drum { color: var(--drum); } .shape-ring.cat-bass { color: var(--bass); } .shape-ring.cat-harm { color: var(--harm); }
 .shape-ring.cat-lead { color: var(--lead); } .shape-ring.cat-fx { color: var(--fx); }
-.float { position: absolute; top: -4px; transform: translateX(-50%); font-family: var(--f-mono); font-weight: 600; font-size: 13px; color: var(--heat); pointer-events: none; animation: rise .8s ease-out forwards; white-space: nowrap; z-index: 3; }
-.float.n { color: var(--noise); top: auto; bottom: -6px; animation-name: sink; }
-@keyframes rise { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -26px); } }
-@keyframes sink { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 14px); } }
-.spot-label { position: absolute; top: -18px; transform: translateX(-50%); font-family: var(--f-mono); font-size: 11px; font-weight: 600; color: var(--lead); }
-.preview { margin-top: 10px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.preview b { font-family: var(--f-mono); color: var(--fg); font-weight: 600; }
+.over-label { text-align: center; font-size: 12px; font-weight: 700; color: var(--noise); min-height: 18px; }
 
-.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 button.btn {
-  font: inherit; font-weight: 700; padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--fg);
+  font: inherit; font-weight: 700; padding: 9px 16px; border-radius: 10px; border: 1.5px solid var(--fg);
   background: var(--fg); color: var(--bg); cursor: pointer; letter-spacing: .04em;
 }
 button.btn.ghost { background: transparent; color: var(--fg); }
 button.btn:disabled { opacity: .35; cursor: default; }
-button.btn.small { padding: 6px 12px; font-size: 13px; }
+button.btn.small { padding: 5px 11px; font-size: 13px; }
+.sound { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+.sound label { display: flex; gap: 6px; align-items: center; }
+select { font: inherit; color: var(--fg); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 4px 8px; }
 
 .panel-title { font-size: 12px; color: var(--muted); letter-spacing: .08em; margin: 0 0 6px; }
-.hand { display: flex; flex-wrap: wrap; gap: 6px; min-height: 44px; }
+.hand { display: flex; flex-wrap: wrap; gap: 6px; min-height: 38px; }
 .chip {
-  display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 99px;
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 99px;
   background: var(--surface); border: 1.5px solid var(--line); cursor: pointer; font: inherit; color: var(--fg);
 }
 .chip.sel { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
 .chip .tile { width: 22px; height: 22px; font-size: 11px; }
 .empty-hand { color: var(--muted); font-size: 13px; align-self: center; }
-.info { min-height: 46px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.info { min-height: 52px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .info strong { font-weight: 700; }
-.info .stat { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.editor { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.note { font-family: var(--f-mono); font-weight: 600; min-width: 42px; text-align: center; font-size: 15px; }
+.hint { color: var(--muted); font-size: 12px; }
 
 .overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 20;
   padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
@@ -136,68 +131,67 @@ button.btn.small { padding: 6px 12px; font-size: 13px; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; }
 .modal h2 { font-family: var(--f-display); font-weight: 400; font-size: 24px; margin: 0; text-wrap: balance; }
 .modal p { margin: 0; color: var(--muted); }
-.offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.offer { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); min-width: 0; }
+.offers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.offers.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.offer { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); min-width: 0; cursor: pointer; text-align: left; font: inherit; color: var(--fg); }
+.offer:hover { border-color: var(--fg); }
 .offer-head { display: flex; align-items: center; gap: 8px; }
 .offer-head .tile { width: 26px; height: 26px; font-size: 12px; flex: none; }
 .offer-name { font-weight: 700; }
-.offer-desc { font-size: 12px; color: var(--muted); flex: 1; }
-.offer button { align-self: flex-start; }
-.offer.sold { opacity: .4; }
-.earn { font-family: var(--f-mono); font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
-.earn span:nth-child(even) { text-align: right; color: var(--gold); }
+.offer-desc { font-size: 12px; color: var(--muted); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 details { font-size: 13px; color: var(--muted); }
 details summary { cursor: pointer; color: var(--fg); font-weight: 500; }
 details ul { margin: 6px 0 0; padding-left: 18px; }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
-@media (max-width: 420px) {
-  .offers { grid-template-columns: 1fr; }
-  .board { gap: 4px; }
-  .board-wrap { padding: 8px; }
+@media (max-width: 460px) {
+  .offers, .offers.two { grid-template-columns: 1fr; }
+  .board { gap: 3px; grid-template-columns: 12px repeat(8, minmax(0, 1fr)); }
+  .stage { padding: 8px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .board-wrap.shake { animation: none; }
-  .float { animation-duration: .01s; }
-}
+@media (prefers-reduced-motion: reduce) { .bar.hot > i { animation: none; } }
 </style>
 
 <div class="app">
   <header>
     <h1>LOOP</h1>
-    <div class="round-info">
-      <span id="roundLabel">ROUND 1/4</span>
-      <span id="bossTag" class="boss-tag" hidden></span>
-      <span class="coins" id="coinLabel">◎ 0</span>
+    <div class="status">
+      <span id="stageLabel">STAGE 1/5</span>
+      <span class="life" id="lifeLabel">♥ 10</span>
     </div>
   </header>
+  <div class="relics" id="relics" hidden></div>
 
-  <section class="meters" aria-label="ステータス">
-    <div class="meter">
-      <div class="meter-label"><span>熱量</span><b id="heatText">0 / 120</b></div>
-      <div class="bar" id="heatBar"><i></i></div>
-    </div>
-    <div class="meter">
-      <div class="meter-label"><span>ノイズ</span><b id="noiseText">0 / 40</b></div>
-      <div class="bar" id="noiseBar"><i></i></div>
-    </div>
-    <div class="passes" id="passes" aria-label="周回"></div>
-  </section>
+  <div class="meter">
+    <div class="meter-label"><span>ノイズ（たまりすぎると1小節止まる）</span><b id="noiseText">0 / 30</b></div>
+    <div class="bar" id="noiseBar"><i></i></div>
+  </div>
 
-  <section class="board-wrap" id="boardWrap">
+  <section class="stage">
+    <canvas id="field" aria-label="敵が左のスピーカーに向かって進んでくるレーン"></canvas>
     <div class="board" id="beatNums"></div>
-    <div class="board" id="board" style="margin-top:6px"></div>
-    <div class="preview" id="preview"></div>
+    <div class="board" id="board"></div>
+    <div class="over-label" id="overLabel"></div>
   </section>
 
   <div class="controls">
-    <button class="btn" id="playBtn">▶ 演奏する</button>
-    <button class="btn ghost" id="fadeBtn" disabled>フェードアウト</button>
+    <button class="btn" id="playBtn">▶ ステージ開始</button>
+    <button class="btn ghost" id="listenBtn">♪ 試聴</button>
     <button class="btn ghost small" id="speedBtn">速度 ×1</button>
   </div>
 
+  <div class="sound">
+    <label for="rootSel">調
+      <select id="rootSel"></select>
+    </label>
+    <label for="scaleSel">音階
+      <select id="scaleSel"></select>
+    </label>
+    <span class="hint">音の設定は強さに影響しません</span>
+  </div>
+
   <section>
-    <p class="panel-title">手持ちのタイル</p>
+    <p class="panel-title">手持ちのタイル（選んでからマスへ）</p>
     <div class="hand" id="hand"></div>
   </section>
 
@@ -206,15 +200,15 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
   <details>
     <summary>遊び方</summary>
     <ul>
-      <li>手持ちのタイルを選び、盤面のマスに置きます。置いたタイルをタップすると手持ちに戻ります。</li>
-      <li>「演奏する」で8拍のループが4周再生されます。拍ごとにその列のタイルが鳴り、熱量がたまります。</li>
-      <li>同じ列（同じ拍）にタイルを重ねるほど倍率が上がります（1つ増えるごとに＋0.5倍）。</li>
-      <li>毎周ランダムに1列がスポットライト（熱量・ノイズとも×2）になります。</li>
-      <li>ノイズが40に達すると観客が帰ってしまい、ゲームオーバーです。</li>
-      <li>目標に届いたら「フェードアウト」で早めに終えると、残り周回ぶんのコインがもらえます。</li>
+      <li>上のレーンを、敵が左のスピーカーに向かって進んできます。たどり着かれるとライフが減ります。</li>
+      <li>下の盤面の段は、上のレーンと同じ番号です。再生位置がタイルを通ると音が鳴り、そのレーンに攻撃が出ます。</li>
+      <li>演奏中でもタイルは置き直せます。置いたタイルを選ぶと、説明と音程の変更ができます。</li>
+      <li>和音は同じ列の他のタイルの攻撃を2倍にします。ノイズが30に達すると1小節演奏が止まります。</li>
+      <li>音程・調・音階は好きに変えてください。強さは変わりません。</li>
+      <li>ステージをクリアするとタイルを1つもらえます。2・4ステージ後は装置も選べます。5ステージ目はボスです。</li>
     </ul>
   </details>
-  <p class="proto">PROTOTYPE v0.1 — コアループ検証用</p>
+  <p class="proto">PROTOTYPE v0.2 — 防衛戦＋自由な音づくりの検証用</p>
 </div>
 
 <div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
@@ -223,115 +217,135 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
 (() => {
 'use strict';
 
-// ---------- constants ----------
-const STEPS = 8, ROWS = 4, PASSES = 4, NOISE_MAX = 40;
-const ROUNDS = [
-  { target: 150 },
-  { target: 400 },
-  { target: 850 },
-  { target: 1300, boss: { name: 'ボス：メトロノーム', desc: '偶数拍（2・4・6・8拍目）のタイルは熱量0。ノイズだけはたまる。' } },
-];
-const START_HAND = ['kick', 'kick', 'snare', 'hat', 'hat', 'bass'];
+// ================= constants =================
+const LANES = 4, STEPS = 8, STEP_DUR = 0.3, MAX_LIFE = 10;
+const OVERHEAT_STEPS = 8;
 
-// cat: drum | bass | harm | lead | fx    shape: circle | square | tri | diamond | ring
-const DEFS = {
-  kick:     { name: 'キック', g: 'キ', cat: 'drum', shape: 'circle', price: 2, desc: '熱量+5',
-              eval: () => ({ heat: 5 }) },
-  snare:    { name: 'スネア', g: 'ス', cat: 'drum', shape: 'circle', price: 2, desc: '熱量+3。同じ拍にキックがあれば+8',
-              eval: c => ({ heat: c.col.some(t => t.id === 'kick') ? 8 : 3 }) },
-  hat:      { name: 'ハット', g: 'ハ', cat: 'drum', shape: 'circle', price: 1, desc: '熱量+2。同じ段にある他のハット1つにつき+2',
-              eval: c => ({ heat: 2 + 2 * (c.rowTiles.filter(t => t.id === 'hat').length - 1) }) },
-  bass:     { name: 'ベース', g: 'ベ', cat: 'bass', shape: 'square', price: 3, desc: '熱量+3。同じ拍の他のタイル1つにつき+2',
-              eval: c => ({ heat: 3 + 2 * (c.col.length - 1) }) },
-  chord:    { name: '和音', g: '和', cat: 'harm', shape: 'tri', price: 4, desc: '熱量+2。この拍の倍率+1。ノイズ+1',
-              eval: () => ({ heat: 2, mult: 1, noise: 1 }) },
-  lead:     { name: 'リード', g: '旋', cat: 'lead', shape: 'diamond', price: 4, desc: '熱量+9。ノイズ+2',
-              eval: () => ({ heat: 9, noise: 2 }) },
-  cresc:    { name: 'クレッシェンド', g: '昇', cat: 'harm', shape: 'tri', price: 4, desc: '熱量+4×周回数（4周目で+16）。ノイズ+1',
-              eval: c => ({ heat: 4 * c.pass, noise: 1 }) },
-  echo:     { name: 'エコー', g: '響', cat: 'lead', shape: 'diamond', price: 5, desc: '熱量+3。ノイズ+1。毎周の終わりに右側の空きマスへ「残響」を置く（ラウンド終了で消える）',
-              eval: () => ({ heat: 3, noise: 1 }) },
-  shadow:   { name: '残響', g: '響', cat: 'lead', shape: 'diamond', price: 0, desc: 'エコーが残した音。熱量+3。ノイズ+1', temp: true,
-              eval: () => ({ heat: 3, noise: 1 }) },
-  ghost:    { name: 'ゴースト', g: '幽', cat: 'harm', shape: 'ring', price: 5, desc: '1周目は鳴らない。2周目から熱量+16。ノイズ+2',
-              eval: c => c.pass === 1 ? { silent: true } : { heat: 16, noise: 2 } },
-  rest:     { name: '休符', g: '休', cat: 'fx', shape: 'ring', price: 3, desc: 'ノイズ-4。倍率には数えない', quiet: true,
-              eval: () => ({ noise: -4, silent: true }) },
-  dist:     { name: 'ディストーション', g: '歪', cat: 'fx', shape: 'square', price: 5, desc: '熱量+20。ノイズ+6',
-              eval: () => ({ heat: 20, noise: 6 }) },
-  feedback: { name: 'フィードバック', g: '返', cat: 'fx', shape: 'circle', price: 5, desc: '熱量＋現在のノイズ。ノイズ+2',
-              eval: c => ({ heat: c.noise, noise: 2 }) },
+const SCALES = {
+  dark:   { name: '暗い（マイナー・ペンタ）', s: [0, 3, 5, 7, 10] },
+  bright: { name: '明るい（メジャー・ペンタ）', s: [0, 2, 4, 7, 9] },
+  major:  { name: '長調（7音）', s: [0, 2, 4, 5, 7, 9, 11] },
+  minor:  { name: '短調（7音）', s: [0, 2, 3, 5, 7, 8, 10] },
+  blues:  { name: 'ブルース', s: [0, 3, 5, 6, 7, 10] },
+  miyako: { name: '和風（都節）', s: [0, 1, 5, 7, 8] },
 };
-const SHOP_POOL = ['kick', 'snare', 'hat', 'bass', 'chord', 'lead', 'cresc', 'echo', 'ghost', 'rest', 'dist', 'feedback'];
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const PROG = [0, 0, 2, 2, 3, 3, 1, 4];
 
-// ---------- state ----------
-let S;
+// Enemy types. speed = field-lengths per second, dmg = life lost on arrival.
+const ENEMIES = {
+  dot:   { hp: 4,   speed: .09,  dmg: 1,  armor: 0, r: 7,  shape: 'circle' },
+  dash:  { hp: 3,   speed: .17,  dmg: 1,  armor: 0, r: 7,  shape: 'tri' },
+  block: { hp: 18,  speed: .05,  dmg: 3,  armor: 1, r: 10, shape: 'square' },
+  mini:  { hp: 2,   speed: .09,  dmg: 1,  armor: 0, r: 5,  shape: 'circle' },
+  boss:  { hp: 300, speed: .02,  dmg: 6,  armor: 0, r: 16, shape: 'hex' },
+};
+
+function wave(list, type, count, start, interval, lanes) {
+  for (let i = 0; i < count; i++) list.push({ t: start + i * interval, type, lanes });
+}
+const ALL = [0, 1, 2, 3];
+const STAGES = [
+  { name: 'STAGE 1', make: l => { wave(l, 'dot', 14, 2, 2.2, [1, 2]); } },
+  { name: 'STAGE 2', make: l => { wave(l, 'dot', 18, 2, 1.8, ALL); wave(l, 'dash', 8, 8, 3.5, ALL); } },
+  { name: 'STAGE 3', make: l => { wave(l, 'dot', 22, 2, 1.4, ALL); wave(l, 'dash', 10, 6, 3, ALL); wave(l, 'block', 6, 10, 5, ALL); } },
+  { name: 'STAGE 4', make: l => { wave(l, 'dot', 30, 2, 1.1, ALL); wave(l, 'dash', 16, 4, 2.2, ALL); wave(l, 'block', 10, 8, 4, ALL); } },
+  { name: 'BOSS', boss: true, make: l => { l.push({ t: 2, type: 'boss', lanes: [1] }); wave(l, 'dot', 16, 6, 2.5, ALL); wave(l, 'dash', 10, 15, 4, ALL); } },
+];
+
+const RELICS = {
+  amp:      { name: 'アンプ', desc: '打楽器（キック・スネア・ハット）のダメージ+1' },
+  gate:     { name: 'ノイズゲート', desc: 'ノイズの上限 30→42' },
+  downbeat: { name: 'ダウンビート', desc: '1拍目と5拍目のタイルの攻撃が2倍' },
+  sub:      { name: 'サブウーファー', desc: 'ベースの減速が長くなり、ダメージ+2' },
+};
+
+// Tiles. fire(c) does the gameplay; reg/auto define the default sound only.
+// reg: register in MIDI for pitched tiles (null = unpitched drum).
+const DEFS = {
+  kick:  { name: 'キック', g: 'キ', cat: 'drum', shape: 'circle', reg: null, noise: 0,
+           desc: '全レーンの先頭の敵に1ダメージ',
+           fire: c => { for (let l = 0; l < LANES; l++) c.hitFront(l, 1 + c.drumBonus); } },
+  snare: { name: 'スネア', g: 'ス', cat: 'drum', shape: 'circle', reg: null, noise: 0,
+           desc: '自分のレーンの先頭の敵に3ダメージ',
+           fire: c => c.hitFront(c.lane, 3 + c.drumBonus) },
+  hat:   { name: 'ハット', g: 'ハ', cat: 'drum', shape: 'circle', reg: null, noise: 0,
+           desc: '自分のレーンの先頭の敵に1ダメージ。数を並べて使う',
+           fire: c => c.hitFront(c.lane, 1 + c.drumBonus) },
+  cymbal:{ name: 'シンバル', g: 'シ', cat: 'drum', shape: 'ring', reg: null, noise: 2,
+           desc: '全レーンの先頭の敵を少し押し戻す。ノイズ+2',
+           fire: c => { for (let l = 0; l < LANES; l++) c.knock(l, .08); } },
+  bass:  { name: 'ベース', g: 'ベ', cat: 'bass', shape: 'square', reg: 36, noise: 0,
+           desc: '自分のレーンの敵すべてを遅くし、先頭に1ダメージ',
+           fire: c => { c.slow(c.lane, c.relic.sub ? 2.6 : 1.5); c.hitFront(c.lane, 1 + (c.relic.sub ? 2 : 0)); } },
+  chord: { name: '和音', g: '和', cat: 'harm', shape: 'tri', reg: 55, noise: 1,
+           desc: '同じ列の他のタイルの攻撃を2倍にする（重ねがけ可）。ノイズ+1',
+           fire: () => {} },
+  lead:  { name: 'リード', g: '旋', cat: 'lead', shape: 'diamond', reg: 67, noise: 1,
+           desc: '自分のレーンの敵すべてに2ダメージ（貫通）。ノイズ+1',
+           fire: c => c.hitAll(c.lane, 2) },
+  echo:  { name: 'エコー', g: '響', cat: 'lead', shape: 'diamond', reg: 72, noise: 1,
+           desc: '先頭の敵に2ダメージ。2拍後にもう一度2ダメージ。ノイズ+1',
+           fire: c => { c.hitFront(c.lane, 2); c.later(2, () => c.hitFront(c.lane, 2)); } },
+  cresc: { name: 'クレッシェンド', g: '昇', cat: 'harm', shape: 'tri', reg: 60, noise: 1,
+           desc: '先頭の敵にダメージ。ステージ開始から1小節ごとに+1（最大7）。ノイズ+1',
+           fire: c => c.hitFront(c.lane, Math.min(7, 1 + c.loop)) },
+  dist:  { name: 'ディストーション', g: '歪', cat: 'fx', shape: 'square', reg: 43, noise: 4,
+           desc: '先頭の敵に9ダメージ。硬い敵に強い。ノイズ+4',
+           fire: c => c.hitFront(c.lane, 9) },
+  ghost: { name: 'ゴースト', g: '幽', cat: 'harm', shape: 'ring', reg: 79, noise: 1,
+           desc: 'レーンの一番奥（出てきたばかり）の敵に4ダメージ。ノイズ+1',
+           fire: c => c.hitBack(c.lane, 4) },
+  feedback: { name: 'フィードバック', g: '返', cat: 'fx', shape: 'circle', reg: 84, noise: 2,
+           desc: '先頭の敵に「1＋ノイズ÷3」ダメージ。ノイズ+2',
+           fire: c => c.hitFront(c.lane, 1 + Math.floor(c.noise / 3)) },
+  rest:  { name: '休符', g: '休', cat: 'fx', shape: 'ring', reg: null, noise: -3, silent: true,
+           desc: 'ノイズ-3。音は鳴らない',
+           fire: () => {} },
+};
+const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest'];
+const START_HAND = ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'];
+
+// ================= state =================
 let uid = 1;
-const mk = id => ({ id, uid: uid++ });
-function newRun() {
+const mk = id => ({ id, uid: uid++, p: null });
+let G;
+function newGame() {
   return {
-    round: 0, coins: 0, phase: 'build',
-    board: Array.from({ length: ROWS }, () => Array(STEPS).fill(null)),
+    stage: 0, life: MAX_LIFE, relics: {},
+    board: Array.from({ length: LANES }, () => Array(STEPS).fill(null)),
     hand: START_HAND.map(mk),
-    heat: 0, noise: 0, pass: 0, step: -1, spot: -1,
-    offers: [], selected: -1, speed: 1, lastGain: null,
+    phase: 'build', listening: false, speed: 1,
+    selHand: -1, selCell: null,
+    root: 9, scale: 'dark',
+    ...freshStage(),
   };
 }
-
-// ---------- scoring ----------
-// Evaluates one beat column. Pure apart from reading board/noise; returns heat gained and noise delta.
-function evalColumn(board, step, pass, noiseNow, boss, spot) {
-  const col = [];
-  for (let r = 0; r < ROWS; r++) if (board[r][step]) col.push({ ...board[r][step], r });
-  let heat = 0, mult = 0, noise = noiseNow, sounding = 0;
-  const hits = [];
-  const ctxCol = col.filter(t => !DEFS[t.id].quiet && !(t.id === 'ghost' && pass === 1));
-  for (const t of col) {
-    const rowTiles = board[t.r].filter(Boolean);
-    const res = DEFS[t.id].eval({ col: ctxCol, rowTiles, pass, noise: Math.max(0, noise), step });
-    let h = res.heat || 0;
-    if (boss && step % 2 === 1) h = 0;
-    heat += h;
-    mult += res.mult || 0;
-    noise += res.noise || 0;
-    if (!res.silent) { sounding++; hits.push(t); }
-  }
-  const factor = 1 + 0.5 * Math.max(0, sounding - 1) + mult;
-  let gain = Math.round(heat * factor);
-  let dNoise = noise - noiseNow;
-  if (step === spot) { gain *= 2; if (dNoise > 0) dNoise *= 2; }
-  return { gain, dNoise, factor, hits, col };
+function freshStage() {
+  return { t: 0, acc: 0, step: -1, stepCount: 0, loop: 0, noise: 0, overheat: 0,
+           enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
+           muted: -1, mutedLeft: 0, hits: [] };
 }
+const noiseMax = () => G.relics.gate ? 42 : 30;
 
-// Deterministic estimate of pass 1 (no spotlight) for the build-phase preview.
-function previewPass(pass = 1) {
-  let heat = 0, noise = 0;
-  const boss = !!ROUNDS[S.round].boss;
-  for (let s = 0; s < STEPS; s++) {
-    const r = evalColumn(S.board, s, pass, noise, boss, -1);
-    heat += r.gain; noise = Math.max(0, noise + r.dNoise);
-  }
-  return { heat, noise };
-}
-
-// ---------- audio ----------
+// ================= audio =================
 let ac = null, master, shaper, noiseBuf;
 function ensureAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ac = new AC();
-  master = ac.createGain(); master.gain.value = .55;
+  master = ac.createGain(); master.gain.value = .5;
   shaper = ac.createWaveShaper(); setDrive(0);
   const comp = ac.createDynamicsCompressor();
   master.connect(shaper); shaper.connect(comp); comp.connect(ac.destination);
-  noiseBuf = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate);
-  const d = noiseBuf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * .6, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
+let lastDrive = -1;
 function setDrive(x) {
   if (!shaper) return;
-  const k = x * 80, n = 1024, curve = new Float32Array(n);
+  const q = Math.round(x * 10) / 10; if (q === lastDrive) return; lastDrive = q;
+  const k = q * 70, n = 1024, curve = new Float32Array(n);
   for (let i = 0; i < n; i++) { const v = i * 2 / n - 1; curve[i] = k ? (1 + k) * v / (1 + k * Math.abs(v)) : v; }
   shaper.curve = curve;
 }
@@ -349,292 +363,454 @@ function osc(type, f, t, peak, dec, att, filt) {
   o.start(t); o.stop(t + (att || .002) + dec + .05);
   return o;
 }
-function noise(t, type, freq, peak, dec) {
+function noiseHit(t, type, freq, peak, dec) {
   const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
   s.buffer = noiseBuf; f.type = type; f.frequency.value = freq;
   s.connect(f); f.connect(g); g.connect(master); env(g, t, peak, dec);
   s.start(t); s.stop(t + dec + .05);
 }
-const PENTA = [0, 3, 5, 7, 10];
-const PROG = [0, 0, 2, 2, 3, 3, 1, 4];
-function note(base, idx) { const o = Math.floor(idx / 5), d = PENTA[((idx % 5) + 5) % 5]; return base * Math.pow(2, o + d / 12); }
-function playTile(id, step, row, pass, t) {
-  const root = PROG[step];
-  switch (id) {
-    case 'kick': { const o = osc('sine', 150, t, .9, .26); o.frequency.exponentialRampToValueAtTime(42, t + .14); break; }
-    case 'snare': noise(t, 'bandpass', 1900, .5, .16); osc('triangle', 190, t, .25, .08); break;
-    case 'hat': noise(t, 'highpass', 7500, .22, .05); break;
-    case 'bass': osc('sawtooth', note(55, root), t, .32, .24, .004, 520); break;
-    case 'chord': [0, 2, 4].forEach(i => osc('triangle', note(220, root + i), t, .1, .45, .01)); break;
-    case 'lead': osc('square', note(440, root + (3 - row) * 2), t, .09, .2, .004, 2600); break;
-    case 'cresc': osc('sine', note(330, root + 2), t, .05 + .04 * pass, .35, .03); break;
-    case 'echo': osc('triangle', note(660, root + row), t, .12, .3); break;
-    case 'shadow': osc('triangle', note(660, root + row), t, .05, .3); break;
-    case 'ghost': osc('sine', note(880, root + 1), t, .1, .5, .08); break;
-    case 'dist': osc('sawtooth', note(110, root), t, .18, .28, .004, 1800); osc('sawtooth', note(110, root + 3), t, .14, .28, .004, 1800); break;
-    case 'feedback': osc('square', note(1760, root + row), t, .05, .12); break;
+// degree -> midi in the chosen key/scale, starting from register `reg` (rounded to key root)
+function degToMidi(reg, deg) {
+  const sc = SCALES[G.scale].s, n = sc.length;
+  const base = reg - ((reg - G.root) % 12 + 12) % 12; // nearest root at or below reg
+  const o = Math.floor(deg / n), i = ((deg % n) + n) % n;
+  return base + 12 * o + sc[i];
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const midiName = m => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+function autoDeg(id, lane, step) {
+  const n = SCALES[G.scale].s.length;
+  const prog = Math.round(PROG[step] * n / 5);
+  if (id === 'lead' || id === 'echo' || id === 'ghost' || id === 'feedback') return prog + (LANES - 1 - lane);
+  return prog;
+}
+const tileDeg = (t, lane, step) => t.p ?? autoDeg(t.id, lane, step);
+function playTile(t, lane, step, at) {
+  if (!ac) return;
+  const time = at ?? ac.currentTime + .01;
+  const d = DEFS[t.id];
+  const deg = tileDeg(t, lane, step);
+  const f = d.reg != null ? mtof(degToMidi(d.reg, deg)) : 0;
+  const fifth = d.reg != null ? mtof(degToMidi(d.reg, deg + Math.round(SCALES[G.scale].s.length * 0.6))) : 0;
+  switch (t.id) {
+    case 'kick': { const o = osc('sine', 150, time, .9, .26); o.frequency.exponentialRampToValueAtTime(42, time + .14); break; }
+    case 'snare': noiseHit(time, 'bandpass', 1900, .45, .15); osc('triangle', 190, time, .22, .08); break;
+    case 'hat': noiseHit(time, 'highpass', 7500, .2, .05); break;
+    case 'cymbal': noiseHit(time, 'highpass', 5200, .22, .45); break;
+    case 'bass': osc('sawtooth', f, time, .3, .24, .004, 600); break;
+    case 'chord': [0, 2, 4].forEach(i => osc('triangle', mtof(degToMidi(d.reg, deg + i)), time, .09, .42, .01)); break;
+    case 'lead': osc('square', f, time, .08, .2, .004, 2600); break;
+    case 'echo': osc('triangle', f, time, .12, .28); osc('triangle', f, time + STEP_DUR * 2 / G.speed, .06, .28); break;
+    case 'cresc': osc('sine', f, time, Math.min(.2, .05 + .02 * G.loop), .35, .03); break;
+    case 'dist': osc('sawtooth', f, time, .16, .28, .004, 1800); osc('sawtooth', fifth, time, .12, .28, .004, 1800); break;
+    case 'ghost': osc('sine', f, time, .1, .5, .08); break;
+    case 'feedback': osc('square', f, time, .05, .12); break;
   }
 }
 function sfx(kind) {
   if (!ac) return;
   const t = ac.currentTime + .02;
-  if (kind === 'clear') [0, 2, 4, 5, 7].forEach((i, k) => osc('triangle', note(440, i), t + k * .08, .12, .3));
-  if (kind === 'fail') { noise(t, 'lowpass', 900, .5, 1.1); const o = osc('sawtooth', 220, t, .2, 1.1, .01, 900); o.frequency.exponentialRampToValueAtTime(40, t + 1.1); }
-  if (kind === 'buy') osc('sine', 1320, t, .12, .12);
+  if (kind === 'clear') [0, 1, 2, 3, 4].forEach((i, k) => osc('triangle', mtof(degToMidi(72, i)), t + k * .08, .12, .3));
+  if (kind === 'hurt') { const o = osc('square', 220, t, .15, .25, .005, 900); o.frequency.exponentialRampToValueAtTime(80, t + .25); }
+  if (kind === 'over') { noiseHit(t, 'lowpass', 900, .4, .9); }
+  if (kind === 'fail') { const o = osc('sawtooth', 220, t, .2, 1.1, .01, 900); o.frequency.exponentialRampToValueAtTime(40, t + 1.1); }
+  if (kind === 'pick') osc('sine', 1320, t, .12, .12);
 }
 
-// ---------- rendering ----------
+// ================= gameplay =================
+function frontmost(lane) { let best = null; for (const e of G.enemies) if (e.lane === lane && e.hp > 0 && (!best || e.x < best.x)) best = e; return best; }
+function backmost(lane) { let best = null; for (const e of G.enemies) if (e.lane === lane && e.hp > 0 && (!best || e.x > best.x)) best = e; return best; }
+function damage(e, amount, color) {
+  if (!e || e.hp <= 0) return;
+  const d = Math.max(1, Math.round(amount) - e.armor);
+  e.hp -= d; e.flash = .12;
+  G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
+  G.texts.push({ lane: e.lane, x: e.x, txt: String(d), life: .6 });
+  if (e.hp <= 0) {
+    G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', life: .3, max: .3, r: e.r });
+  }
+}
+function makeCtx(lane, step, mul, color) {
+  return {
+    lane, step, loop: G.loop, noise: G.noise, relic: G.relics,
+    drumBonus: G.relics.amp ? 1 : 0,
+    hitFront: (l, d) => damage(frontmost(l), d * mul, color),
+    hitBack: (l, d) => damage(backmost(l), d * mul, color),
+    hitAll: (l, d) => { for (const e of G.enemies.filter(e => e.lane === l && e.hp > 0)) damage(e, d * mul, color); },
+    slow: (l, s) => { for (const e of G.enemies) if (e.lane === l) e.slow = Math.max(e.slow, s); G.fx.push({ kind: 'lane', lane: l, color, life: .25, max: .25 }); },
+    knock: (l, a) => { const e = frontmost(l); if (e && e.type !== 'boss') { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
+    later: (n, fn) => G.delayed.push({ at: G.stepCount + n, fn }),
+  };
+}
+function spawn(type, lanes) {
+  const T = ENEMIES[type];
+  const lane = lanes[Math.floor(Math.random() * lanes.length)];
+  G.enemies.push({ type, lane, x: 1, hp: T.hp, max: T.hp, speed: T.speed, dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
+}
+function startStage() {
+  Object.assign(G, freshStage());
+  const list = []; STAGES[G.stage].make(list); list.sort((a, b) => a.t - b.t);
+  G.spawns = list; G.phase = 'play'; G.listening = false; setDrive(0);
+  renderAll();
+}
+function doStep() {
+  G.step = (G.step + 1) % STEPS;
+  G.stepCount++;
+  if (G.step === 0 && G.stepCount > 1) G.loop++;
+  G.hits = [];
+  // delayed effects (echo)
+  const due = G.delayed.filter(d => d.at <= G.stepCount); G.delayed = G.delayed.filter(d => d.at > G.stepCount);
+  if (G.phase === 'play') due.forEach(d => d.fn());
+  G.noise = Math.max(0, G.noise - .5);
+
+  if (G.phase === 'play') bossLogic();
+  if (G.mutedLeft > 0) { G.mutedLeft--; if (!G.mutedLeft) G.muted = -1; }
+
+  if (G.overheat > 0) {
+    G.overheat--;
+    if (!G.overheat) G.noise = 0;
+    if (ac) noiseHit(ac.currentTime + .01, 'highpass', 9000, .04, .03);
+    stepUI(); return;
+  }
+  if (G.step === G.muted) { stepUI(); return; }
+
+  const col = [];
+  for (let l = 0; l < LANES; l++) if (G.board[l][G.step]) col.push({ t: G.board[l][G.step], lane: l });
+  const chords = col.filter(c => c.t.id === 'chord').length;
+  let mulBase = 1;
+  if (G.relics.downbeat && (G.step === 0 || G.step === 4)) mulBase *= 2;
+  const t0 = ac ? ac.currentTime + .01 : 0;
+  for (const c of col) {
+    const d = DEFS[c.t.id];
+    const mul = mulBase * (c.t.id === 'chord' ? 1 : Math.pow(2, chords));
+    if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, mul, d.cat));
+    G.noise = Math.max(0, G.noise + (G.phase === 'play' ? d.noise : 0));
+    if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
+  }
+  if (G.phase === 'play' && G.noise >= noiseMax()) {
+    G.overheat = OVERHEAT_STEPS; sfx('over');
+  }
+  setDrive(G.phase === 'play' ? Math.min(1, G.noise / noiseMax()) * .85 : 0);
+  stepUI();
+}
+function bossLogic() {
+  const boss = G.enemies.find(e => e.type === 'boss' && e.hp > 0);
+  if (!boss) return;
+  // every 2 bars: jump lane and mute a random beat for one bar
+  if (G.step === 0 && G.loop > 0 && G.loop % 2 === 0) {
+    boss.lane = Math.floor(Math.random() * LANES);
+    G.muted = Math.floor(Math.random() * STEPS); G.mutedLeft = STEPS;
+    G.texts.push({ lane: boss.lane, x: boss.x, txt: `${G.muted + 1}拍目を封印`, life: 1.6, warn: true });
+  }
+  if (G.stepCount % 8 === 0) spawn('mini', ALL);
+}
+function update(dt) {
+  G.t += dt;
+  while (G.spawnIdx < G.spawns.length && G.spawns[G.spawnIdx].t <= G.t) {
+    const s = G.spawns[G.spawnIdx++]; spawn(s.type, s.lanes);
+  }
+  for (const e of G.enemies) {
+    if (e.hp <= 0) continue;
+    const sp = e.speed * (e.slow > 0 ? .45 : 1);
+    e.x -= sp * dt; e.slow = Math.max(0, e.slow - dt); e.flash = Math.max(0, e.flash - dt);
+    if (e.x <= 0) {
+      e.hp = 0; G.life -= e.dmg; sfx('hurt');
+      G.fx.push({ kind: 'hurt', lane: e.lane, life: .4, max: .4 });
+      renderStatus();
+    }
+  }
+  G.enemies = G.enemies.filter(e => e.hp > 0);
+  G.acc += dt;
+  while (G.acc >= STEP_DUR) { G.acc -= STEP_DUR; doStep(); if (G.phase !== 'play') return; }
+  if (G.life <= 0) { gameOver(); return; }
+  if (G.spawnIdx >= G.spawns.length && G.enemies.length === 0) stageClear();
+}
+
+// ================= rendering: field =================
+const cv = document.getElementById('field'), cx = cv.getContext('2d');
+let CW = 0, CH = 0;
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  CW = r.width; CH = r.height; cv.width = Math.round(CW * dpr); cv.height = Math.round(CH * dpr);
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+const css = n => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
+function laneY(l) { const h = CH / LANES; return h * l + h / 2; }
+const BASE_X = 26;
+function xPix(x) { return BASE_X + 10 + x * (CW - BASE_X - 26); }
+function drawField(dt) {
+  if (!CW) sizeCanvas();
+  const C = { fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
+              drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') };
+  cx.clearRect(0, 0, CW, CH);
+  const lh = CH / LANES;
+  for (let l = 0; l < LANES; l++) {
+    if (l % 2 === 0) { cx.fillStyle = C.cell; cx.globalAlpha = .45; cx.fillRect(0, l * lh, CW, lh); cx.globalAlpha = 1; }
+    cx.fillStyle = C.muted; cx.font = '600 11px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(String(l + 1), 9, laneY(l));
+  }
+  // speaker / base line
+  cx.fillStyle = C.fg; cx.fillRect(BASE_X - 4, 4, 3, CH - 8);
+  // lane fx
+  for (const f of G.fx) {
+    const a = Math.max(0, f.life / f.max);
+    if (f.kind === 'lane') { cx.fillStyle = C[f.color]; cx.globalAlpha = .18 * a; cx.fillRect(BASE_X, f.lane * lh + 2, CW - BASE_X, lh - 4); }
+    if (f.kind === 'hurt') { cx.fillStyle = C.life; cx.globalAlpha = .35 * a; cx.fillRect(0, f.lane * lh, CW, lh); }
+    if (f.kind === 'beam') { cx.strokeStyle = C[f.color]; cx.globalAlpha = a; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(BASE_X, laneY(f.lane)); cx.lineTo(xPix(f.x), laneY(f.lane)); cx.stroke(); }
+    if (f.kind === 'pop') { cx.strokeStyle = C.enemy; cx.globalAlpha = a; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(xPix(f.x), laneY(f.lane), f.r + (1 - a) * 14, 0, Math.PI * 2); cx.stroke(); }
+    cx.globalAlpha = 1;
+    f.life -= dt;
+  }
+  G.fx = G.fx.filter(f => f.life > 0);
+  // enemies
+  for (const e of G.enemies) {
+    const x = xPix(e.x), y = laneY(e.lane), r = e.r;
+    cx.fillStyle = e.flash > 0 ? C.noise : C.enemy;
+    cx.strokeStyle = C.bass;
+    cx.beginPath();
+    if (e.shape === 'circle') cx.arc(x, y, r, 0, Math.PI * 2);
+    else if (e.shape === 'tri') { cx.moveTo(x - r, y); cx.lineTo(x + r, y - r * .85); cx.lineTo(x + r, y + r * .85); cx.closePath(); }
+    else if (e.shape === 'square') cx.rect(x - r, y - r, r * 2, r * 2);
+    else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
+    cx.fill();
+    if (e.slow > 0) { cx.lineWidth = 2; cx.stroke(); }
+    if (e.max > 3) { // hp bar
+      cx.fillStyle = C.line; cx.fillRect(x - r, y - r - 6, r * 2, 3);
+      cx.fillStyle = C.life; cx.fillRect(x - r, y - r - 6, r * 2 * Math.max(0, e.hp / e.max), 3);
+    }
+  }
+  // damage numbers
+  cx.textAlign = 'center';
+  for (const t of G.texts) {
+    const a = Math.max(0, Math.min(1, t.life / .4));
+    cx.globalAlpha = a; cx.fillStyle = t.warn ? C.noise : C.fg;
+    cx.font = t.warn ? '700 12px "Zen Kaku Gothic New", sans-serif' : '600 11px "IBM Plex Mono", monospace';
+    const tx = Math.max(40, Math.min(CW - 40, xPix(t.x)));
+    cx.fillText(t.txt, tx, laneY(t.lane) - 14 - (1 - a) * 8);
+    t.life -= dt;
+  }
+  cx.globalAlpha = 1;
+  G.texts = G.texts.filter(t => t.life > 0);
+  if (G.phase === 'build' && !G.listening) {
+    cx.fillStyle = C.muted; cx.font = '500 13px "Zen Kaku Gothic New", sans-serif'; cx.textAlign = 'center';
+    cx.fillText(`${STAGES[G.stage].name}　タイルを並べて「ステージ開始」`, CW / 2 + 10, CH / 2);
+  }
+}
+
+// ================= rendering: DOM =================
 const $ = id => document.getElementById(id);
 const boardEl = $('board');
-function tileHTML(id, extra = '') {
+function tileHTML(id) {
   const d = DEFS[id];
   const inner = d.shape === 'diamond' ? `<em>${d.g}</em>` : d.g;
-  return `<span class="tile shape-${d.shape} cat-${d.cat} ${d.temp ? 'shadow' : ''} ${extra}">${inner}</span>`;
+  return `<span class="tile shape-${d.shape} cat-${d.cat}">${inner}</span>`;
 }
 function renderBeats() {
-  const boss = !!ROUNDS[S.round].boss;
-  $('beatNums').innerHTML = Array.from({ length: STEPS }, (_, s) =>
-    `<div class="beat-num ${boss && s % 2 === 1 ? 'off' : ''}">${s + 1}</div>`).join('');
+  $('beatNums').innerHTML = '<div></div>' + Array.from({ length: STEPS }, (_, s) => `<div class="beat-num">${s + 1}</div>`).join('');
 }
 function renderBoard() {
   let html = '';
-  for (let r = 0; r < ROWS; r++) for (let s = 0; s < STEPS; s++) {
-    const t = S.board[r][s];
-    const canDrop = S.phase === 'build' && S.selected >= 0;
-    html += `<button class="cell ${canDrop ? 'target' : ''}" data-r="${r}" data-s="${s}" aria-label="${s + 1}拍目 ${r + 1}段 ${t ? DEFS[t.id].name : '空き'}">${t ? tileHTML(t.id) : ''}</button>`;
+  for (let l = 0; l < LANES; l++) {
+    html += `<div class="lane-num">${l + 1}</div>`;
+    for (let s = 0; s < STEPS; s++) {
+      const t = G.board[l][s];
+      const sel = G.selCell && G.selCell.l === l && G.selCell.s === s;
+      const cls = ['cell', G.selHand >= 0 ? 'target' : '', sel ? 'selc' : '', t && t.p != null ? 'custom' : ''].join(' ');
+      html += `<button class="${cls}" data-l="${l}" data-s="${s}" aria-label="レーン${l + 1} ${s + 1}拍目 ${t ? DEFS[t.id].name : '空き'}">${t ? tileHTML(t.id) : ''}</button>`;
+    }
   }
   boardEl.innerHTML = html;
-  highlightColumn();
+  stepUI();
 }
-function colRect(s) {
-  const c = boardEl.querySelector(`.cell[data-r="0"][data-s="${s}"]`);
-  return c ? { left: c.offsetLeft, width: c.offsetWidth } : null;
+function stepUI() {
+  const running = G.phase === 'play' || G.listening;
+  boardEl.classList.toggle('over', G.overheat > 0);
+  boardEl.querySelectorAll('.cell').forEach(c => {
+    const s = +c.dataset.s, l = +c.dataset.l;
+    c.classList.toggle('ph', running && s === G.step);
+    c.classList.toggle('muted', s === G.muted);
+    c.classList.toggle('hit', running && s === G.step && G.hits.includes(l));
+  });
+  $('overLabel').textContent = G.overheat > 0 ? `オーバーヒート　あと${G.overheat}拍` : G.muted >= 0 ? `${G.muted + 1}拍目が封印されている` : '';
+  renderNoise();
 }
-function highlightColumn() {
-  boardEl.querySelectorAll('.col-bg, .spot-label').forEach(e => e.remove());
-  const add = (s, color, label) => {
-    const r = colRect(s); if (!r) return;
-    const bg = document.createElement('div');
-    bg.className = 'col-bg'; bg.style.left = (r.left - 3) + 'px'; bg.style.width = (r.width + 6) + 'px'; bg.style.background = color;
-    boardEl.prepend(bg);
-    if (label) { const l = document.createElement('div'); l.className = 'spot-label'; l.style.left = (r.left + r.width / 2) + 'px'; l.textContent = label; boardEl.appendChild(l); }
-  };
-  if (S.phase === 'play' && S.spot >= 0) add(S.spot, 'var(--spot)', '×2');
-  if (S.phase === 'play' && S.step >= 0) add(S.step, 'var(--playhead)');
+function renderNoise() {
+  const m = noiseMax();
+  $('noiseText').textContent = `${Math.round(G.noise)} / ${m}`;
+  $('noiseBar').firstElementChild.style.width = Math.min(100, G.noise / m * 100) + '%';
+  $('noiseBar').classList.toggle('hot', G.noise >= m * .75 || G.overheat > 0);
+}
+function renderStatus() {
+  $('stageLabel').textContent = `STAGE ${G.stage + 1}/${STAGES.length}${STAGES[G.stage].boss ? '　BOSS' : ''}`;
+  $('lifeLabel').textContent = `♥ ${Math.max(0, G.life)}`;
+  const rel = Object.keys(G.relics);
+  $('relics').hidden = !rel.length;
+  $('relics').innerHTML = rel.map(k => `<span class="relic" title="${RELICS[k].desc}">${RELICS[k].name}</span>`).join('');
+  $('playBtn').textContent = G.phase === 'play' ? '❚❚ 一時停止' : G.phase === 'paused' ? '▶ 再開' : '▶ ステージ開始';
+  $('playBtn').disabled = !['build', 'play', 'paused'].includes(G.phase);
+  $('listenBtn').disabled = !['build', 'win'].includes(G.phase);
+  $('listenBtn').textContent = G.listening ? '■ 試聴を止める' : '♪ 試聴';
+  $('speedBtn').textContent = `速度 ×${G.speed}`;
 }
 function renderHand() {
   const el = $('hand');
-  if (!S.hand.length) { el.innerHTML = '<span class="empty-hand">すべて盤面に置いています</span>'; return; }
-  el.innerHTML = S.hand.map((t, i) =>
-    `<button class="chip ${i === S.selected ? 'sel' : ''}" data-i="${i}">${tileHTML(t.id)}<span>${DEFS[t.id].name}</span></button>`).join('');
+  if (!G.hand.length) { el.innerHTML = '<span class="empty-hand">すべて盤面に置いています</span>'; return; }
+  el.innerHTML = G.hand.map((t, i) =>
+    `<button class="chip ${i === G.selHand ? 'sel' : ''}" data-i="${i}">${tileHTML(t.id)}<span>${DEFS[t.id].name}</span></button>`).join('');
 }
-function renderInfo(id) {
+function renderInfo() {
   const el = $('info');
-  if (id) { el.innerHTML = `<strong>${DEFS[id].name}</strong>　${DEFS[id].desc}`; return; }
-  if (S.phase === 'play') { el.innerHTML = `演奏中：${S.pass}周目 / ${PASSES}周`; return; }
-  el.innerHTML = S.selected >= 0
-    ? '置きたいマスを選んでください。'
-    : 'タイルを選んで盤面に置き、「演奏する」を押してください。';
-}
-function renderMeters() {
-  const R = ROUNDS[S.round];
-  $('roundLabel').textContent = `ROUND ${S.round + 1}/${ROUNDS.length}`;
-  $('coinLabel').textContent = `◎ ${S.coins}`;
-  const bt = $('bossTag'); bt.hidden = !R.boss; if (R.boss) bt.textContent = R.boss.name;
-  $('heatText').textContent = `${S.heat} / ${R.target}`;
-  $('heatBar').firstElementChild.style.width = Math.min(100, S.heat / R.target * 100) + '%';
-  $('noiseText').textContent = `${S.noise} / ${NOISE_MAX}`;
-  $('noiseBar').firstElementChild.style.width = Math.min(100, S.noise / NOISE_MAX * 100) + '%';
-  $('passes').innerHTML = '<span style="border:0;width:auto;height:auto">周回</span>' + Array.from({ length: PASSES }, (_, i) => {
-    const p = i + 1;
-    const cls = S.phase !== 'play' ? '' : p < S.pass ? 'done' : p === S.pass ? 'now' : '';
-    return `<span class="${cls}"></span>`;
-  }).join('');
-  $('boardWrap').classList.toggle('shake', S.phase === 'play' && S.noise >= NOISE_MAX * .75);
-  const pv = $('preview');
-  if (S.phase === 'build') {
-    const p1 = previewPass(1), p4 = previewPass(4);
-    pv.innerHTML = `<span>1周目の目安 熱量 <b>${p1.heat}</b>・ノイズ <b>+${p1.noise}</b></span><span>4周目の目安 熱量 <b>${p4.heat}</b></span>`;
-  } else pv.innerHTML = `<span>スポットライト（×2）の列は毎周変わります</span>`;
-  $('playBtn').disabled = S.phase !== 'build';
-  $('fadeBtn').disabled = S.phase !== 'play';
-  $('speedBtn').textContent = `速度 ×${S.speed}`;
-}
-function render() { renderBeats(); renderBoard(); renderHand(); renderMeters(); renderInfo(); }
-
-function floatText(s, text, cls = '') {
-  const r = colRect(s); if (!r) return;
-  const f = document.createElement('div');
-  f.className = 'float ' + cls; f.textContent = text; f.style.left = Math.max(28, Math.min(boardEl.clientWidth - 28, r.left + r.width / 2)) + 'px';
-  boardEl.appendChild(f); setTimeout(() => f.remove(), 850);
-}
-
-// ---------- input ----------
-boardEl.addEventListener('click', e => {
-  const c = e.target.closest('.cell'); if (!c || S.phase !== 'build') return;
-  const r = +c.dataset.r, s = +c.dataset.s, cur = S.board[r][s];
-  ensureAudio();
-  if (S.selected >= 0) {
-    const t = S.hand.splice(S.selected, 1)[0];
-    S.board[r][s] = t;
-    if (cur) S.hand.push(cur);
-    S.selected = -1;
-    if (ac) playTile(t.id, s, r, 1, ac.currentTime + .01);
-  } else if (cur) {
-    S.board[r][s] = null; S.hand.push(cur);
-  }
-  render();
-});
-boardEl.addEventListener('mouseover', e => {
-  const c = e.target.closest('.cell'); if (!c) return;
-  const t = S.board[+c.dataset.r][+c.dataset.s]; if (t) renderInfo(t.id);
-});
-boardEl.addEventListener('mouseleave', () => renderInfo());
-$('hand').addEventListener('click', e => {
-  const c = e.target.closest('.chip'); if (!c || S.phase !== 'build') return;
-  const i = +c.dataset.i;
-  S.selected = S.selected === i ? -1 : i;
-  renderHand(); renderBoard();
-  if (S.selected >= 0) renderInfo(S.hand[i].id); else renderInfo();
-});
-$('playBtn').addEventListener('click', () => { ensureAudio(); startRound(); });
-$('fadeBtn').addEventListener('click', () => { if (S.phase === 'play') finish(true); });
-$('speedBtn').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : S.speed === 2 ? 3 : 1; renderMeters(); });
-
-// ---------- round flow ----------
-let timer = null;
-function startRound() {
-  if (S.phase !== 'build') return;
-  S.phase = 'play'; S.heat = 0; S.noise = 0; S.pass = 1; S.step = -1; S.selected = -1;
-  S.spot = Math.floor(Math.random() * STEPS);
-  setDrive(0);
-  render();
-  timer = setTimeout(tick, 250);
-}
-function tick() {
-  if (S.phase !== 'play') return;
-  S.step++;
-  if (S.step >= STEPS) {
-    // end of pass: echoes leave shadows
-    for (let r = 0; r < ROWS; r++) for (let s = STEPS - 1; s >= 0; s--) {
-      const t = S.board[r][s];
-      if (t && t.id === 'echo') {
-        for (let x = s + 1; x < STEPS; x++) if (!S.board[r][x]) { S.board[r][x] = mk('shadow'); break; }
-      }
-    }
-    if (S.pass >= PASSES) { finish(false); return; }
-    S.pass++; S.step = 0;
-    S.spot = Math.floor(Math.random() * STEPS);
-    renderBoard();
-  }
-  const boss = !!ROUNDS[S.round].boss;
-  const res = evalColumn(S.board, S.step, S.pass, S.noise, boss, S.spot);
-  S.heat += res.gain;
-  S.noise = Math.max(0, S.noise + res.dNoise);
-  if (ac) {
-    const t = ac.currentTime + .01;
-    for (const h of res.hits) playTile(h.id, S.step, h.r, S.pass, t);
-    setDrive(Math.min(1, S.noise / NOISE_MAX) * .9);
-  }
-  highlightColumn();
-  boardEl.querySelectorAll('.cell.hit').forEach(c => c.classList.remove('hit'));
-  for (const h of res.hits) boardEl.querySelector(`.cell[data-r="${h.r}"][data-s="${S.step}"]`)?.classList.add('hit');
-  if (res.gain) floatText(S.step, `+${res.gain}${res.factor > 1 ? ` ×${+res.factor.toFixed(1)}` : ''}`);
-  if (res.dNoise) floatText(S.step, `${res.dNoise > 0 ? 'ノイズ+' : 'ノイズ'}${res.dNoise}`, 'n');
-  renderMeters(); renderInfo();
-  if (S.noise >= NOISE_MAX) { fail('ノイズが限界を超え、観客が帰ってしまいました。'); return; }
-  timer = setTimeout(tick, Math.round(300 / S.speed));
-}
-function clearShadows() {
-  for (let r = 0; r < ROWS; r++) for (let s = 0; s < STEPS; s++) if (S.board[r][s]?.id === 'shadow') S.board[r][s] = null;
-}
-function finish(faded) {
-  clearTimeout(timer);
-  const R = ROUNDS[S.round];
-  const remaining = faded ? PASSES - S.pass : 0;
-  clearShadows(); setDrive(0);
-  if (S.heat < R.target) {
-    fail(faded ? `熱量 ${S.heat} で終えました。目標の ${R.target} に届きませんでした。` : `熱量 ${S.heat}。目標の ${R.target} に届きませんでした。`);
+  if (G.selHand >= 0) {
+    const d = DEFS[G.hand[G.selHand].id];
+    el.innerHTML = `<div><strong>${d.name}</strong>　${d.desc}</div><div class="hint">置きたいマスを選んでください。置いてあるタイルとは入れ替わります。</div>`;
     return;
   }
-  const base = 4, fadeBonus = remaining * 2, over = Math.min(3, Math.floor((S.heat / R.target - 1) * 4));
-  const earned = base + fadeBonus + over;
-  S.coins += earned;
-  sfx('clear');
-  if (S.round === ROUNDS.length - 1) { S.phase = 'win'; render(); showWin(); return; }
-  S.phase = 'shop';
-  S.offers = rollOffers();
-  S.lastGain = { base, fadeBonus, over, earned, remaining };
-  render(); showShop();
+  if (G.selCell) {
+    const { l, s } = G.selCell, t = G.board[l][s];
+    if (!t) { G.selCell = null; return renderInfo(); }
+    const d = DEFS[t.id];
+    let editor;
+    if (d.reg != null) {
+      const m = degToMidi(d.reg, tileDeg(t, l, s));
+      editor = `<div class="editor">
+        <span class="hint">音程</span>
+        <button class="btn ghost small" id="pDown" aria-label="音程を下げる">▼</button>
+        <span class="note">${midiName(m)}</span>
+        <button class="btn ghost small" id="pUp" aria-label="音程を上げる">▲</button>
+        <button class="btn ghost small" id="pAuto" ${t.p == null ? 'disabled' : ''}>自動に戻す</button>
+        <button class="btn ghost small" id="toHand">手持ちに戻す</button>
+      </div>`;
+    } else {
+      editor = `<div class="editor"><span class="hint">${d.silent ? '音は鳴りません' : '打楽器なので音程はありません'}</span><button class="btn ghost small" id="toHand">手持ちに戻す</button></div>`;
+    }
+    el.innerHTML = `<div><strong>${d.name}</strong>（レーン${l + 1}・${s + 1}拍目）　${d.desc}</div>${editor}`;
+    const bump = n => {
+      t.p = tileDeg(t, l, s) + n; ensureAudio(); playTile(t, l, s);
+      renderBoard(); renderInfo();
+    };
+    $('pUp') && ($('pUp').onclick = () => bump(1));
+    $('pDown') && ($('pDown').onclick = () => bump(-1));
+    $('pAuto') && ($('pAuto').onclick = () => { t.p = null; ensureAudio(); playTile(t, l, s); renderBoard(); renderInfo(); });
+    $('toHand').onclick = () => { G.board[l][s] = null; G.hand.push(t); G.selCell = null; renderAll(); };
+    return;
+  }
+  el.innerHTML = `<div>手持ちのタイルを選んでマスに置いてください。置いたタイルを選ぶと、説明を見たり音程を変えたりできます。</div>`;
 }
-function fail(msg) {
-  clearTimeout(timer); clearShadows(); setDrive(0);
-  S.phase = 'over'; sfx('fail'); render();
-  showModal(`<h2>演奏失敗</h2><p>${msg}</p><p>到達：ROUND ${S.round + 1}</p>
-    <div class="row"><span></span><button class="btn" id="retry">最初から</button></div>`);
-  $('retry').onclick = () => { hideModal(); S = newRun(); render(); };
-}
-function rollOffers() {
-  const out = [];
-  for (let i = 0; i < 4; i++) out.push({ id: SHOP_POOL[Math.floor(Math.random() * SHOP_POOL.length)], sold: false });
-  return out;
-}
+function renderAll() { renderStatus(); renderBeats(); renderBoard(); renderHand(); renderInfo(); }
 
-// ---------- modals ----------
+// ================= input =================
+boardEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell'); if (!c) return;
+  if (!['build', 'play', 'paused'].includes(G.phase)) return;
+  ensureAudio();
+  const l = +c.dataset.l, s = +c.dataset.s, cur = G.board[l][s];
+  if (G.selHand >= 0) {
+    const t = G.hand.splice(G.selHand, 1)[0];
+    G.board[l][s] = t; if (cur) G.hand.push(cur);
+    G.selHand = -1; G.selCell = { l, s };
+    playTile(t, l, s);
+  } else if (cur) {
+    G.selCell = G.selCell && G.selCell.l === l && G.selCell.s === s ? null : { l, s };
+    if (G.selCell) playTile(cur, l, s);
+  } else G.selCell = null;
+  renderBoard(); renderHand(); renderInfo();
+});
+$('hand').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const i = +c.dataset.i;
+  G.selHand = G.selHand === i ? -1 : i; G.selCell = null;
+  renderHand(); renderBoard(); renderInfo();
+});
+$('playBtn').addEventListener('click', () => {
+  ensureAudio();
+  if (G.phase === 'build') startStage();
+  else if (G.phase === 'play') { G.phase = 'paused'; renderStatus(); }
+  else if (G.phase === 'paused') { G.phase = 'play'; renderStatus(); }
+});
+$('listenBtn').addEventListener('click', () => {
+  ensureAudio();
+  if (!['build', 'win'].includes(G.phase)) return;
+  G.listening = !G.listening; G.step = -1; G.acc = 0; G.hits = [];
+  renderStatus(); stepUI();
+});
+$('speedBtn').addEventListener('click', () => { G.speed = G.speed === 1 ? 2 : 1; renderStatus(); });
+function fillSelects() {
+  $('rootSel').innerHTML = NOTE_NAMES.map((n, i) => `<option value="${i}" ${i === G.root ? 'selected' : ''}>${n}</option>`).join('');
+  $('scaleSel').innerHTML = Object.entries(SCALES).map(([k, v]) => `<option value="${k}" ${k === G.scale ? 'selected' : ''}>${v.name}</option>`).join('');
+}
+$('rootSel').addEventListener('change', e => { G.root = +e.target.value; renderInfo(); });
+$('scaleSel').addEventListener('change', e => { G.scale = e.target.value; renderInfo(); });
+window.addEventListener('resize', () => { CW = 0; });
+
+// ================= flow =================
 function showModal(html) { $('modal').innerHTML = html; $('overlay').hidden = false; }
 function hideModal() { $('overlay').hidden = true; }
-function showShop() {
-  const g = S.lastGain, R = ROUNDS[S.round];
-  const next = ROUNDS[S.round + 1];
-  showModal(`
-    <h2>ROUND ${S.round + 1} クリア</h2>
-    <div class="earn">
-      <span>クリア報酬</span><span>+${g.base}</span>
-      <span>フェードアウト（残り${g.remaining}周）</span><span>+${g.fadeBonus}</span>
-      <span>目標超過（熱量 ${S.heat} / ${R.target}）</span><span>+${g.over}</span>
-      <span><b>所持コイン</b></span><span><b>◎ ${S.coins}</b></span>
-    </div>
-    <p>次の目標：熱量 ${next.target}${next.boss ? `　<b style="color:var(--noise)">${next.boss.name}</b> ${next.boss.desc}` : ''}</p>
-    <div class="offers" id="offers">${S.offers.map((o, i) => `
-      <div class="offer ${o.sold ? 'sold' : ''}">
-        <div class="offer-head">${tileHTML(o.id)}<span class="offer-name">${DEFS[o.id].name}</span></div>
-        <div class="offer-desc">${DEFS[o.id].desc}</div>
-        <button class="btn small ${S.coins < DEFS[o.id].price || o.sold ? 'ghost' : ''}" data-buy="${i}" ${o.sold || S.coins < DEFS[o.id].price ? 'disabled' : ''}>${o.sold ? '購入済み' : `◎ ${DEFS[o.id].price} で買う`}</button>
-      </div>`).join('')}
-    </div>
-    <div class="row">
-      <button class="btn ghost small" id="reroll" ${S.coins < 1 ? 'disabled' : ''}>入れ替える ◎1</button>
-      <button class="btn" id="nextRound">次のラウンドへ</button>
-    </div>`);
+function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(Math.random() * a.length), 1)[0]); return out; }
+function stageClear() {
+  G.phase = 'reward'; G.overheat = 0; G.muted = -1; G.mutedLeft = 0; G.noise = 0; setDrive(0);
+  sfx('clear'); renderAll();
+  if (G.stage === STAGES.length - 1) return showWin();
+  const heal = Math.min(3, MAX_LIFE - G.life); G.life += heal;
+  const offers = pick(REWARD_POOL, 3);
+  showModal(`<h2>${STAGES[G.stage].name} クリア</h2>
+    <p>ライフ +${heal}（♥ ${G.life}）。タイルを1つ選んでください。</p>
+    <div class="offers" id="offers">${offers.map(id => `
+      <button class="offer" data-id="${id}">
+        <span class="offer-head">${tileHTML(id)}<span class="offer-name">${DEFS[id].name}</span></span>
+        <span class="offer-desc">${DEFS[id].desc}</span>
+      </button>`).join('')}</div>`);
   $('offers').onclick = e => {
-    const b = e.target.closest('[data-buy]'); if (!b) return;
-    const o = S.offers[+b.dataset.buy], p = DEFS[o.id].price;
-    if (o.sold || S.coins < p) return;
-    S.coins -= p; o.sold = true; S.hand.push(mk(o.id)); sfx('buy');
-    renderMeters(); renderHand(); showShop();
+    const b = e.target.closest('[data-id]'); if (!b) return;
+    G.hand.push(mk(b.dataset.id)); sfx('pick');
+    if (G.stage === 1 || G.stage === 3) relicPick(); else nextStage();
   };
-  $('reroll').onclick = () => { if (S.coins < 1) return; S.coins -= 1; S.offers = rollOffers(); renderMeters(); showShop(); };
-  $('nextRound').onclick = () => {
-    hideModal(); S.round++; S.phase = 'build'; S.heat = 0; S.noise = 0; S.step = -1; S.spot = -1; render();
+}
+function relicPick() {
+  const options = pick(Object.keys(RELICS).filter(k => !G.relics[k]), 2);
+  if (!options.length) return nextStage();
+  showModal(`<h2>装置を1つ選ぶ</h2><p>装置は盤面全体にずっと効きます。</p>
+    <div class="offers two" id="offers">${options.map(k => `
+      <button class="offer" data-k="${k}"><span class="offer-name">${RELICS[k].name}</span><span class="offer-desc">${RELICS[k].desc}</span></button>`).join('')}</div>`);
+  $('offers').onclick = e => {
+    const b = e.target.closest('[data-k]'); if (!b) return;
+    G.relics[b.dataset.k] = true; sfx('pick'); nextStage();
   };
+}
+function nextStage() {
+  hideModal(); G.stage++; Object.assign(G, freshStage()); G.phase = 'build'; G.selHand = -1; G.selCell = null; renderAll();
+}
+function gameOver() {
+  G.phase = 'over'; setDrive(0); sfx('fail'); renderAll();
+  showModal(`<h2>スピーカーが壊れた</h2><p>${STAGES[G.stage].name} で力尽きました。</p>
+    <div class="row"><span></span><button class="btn" id="retry">最初から</button></div>`);
+  $('retry').onclick = () => { hideModal(); keepKey(() => { G = newGame(); }); renderAll(); };
 }
 function showWin() {
-  showModal(`<h2>全ラウンドクリア</h2>
-    <p>最終ラウンドの熱量：${S.heat}。試作版はここまでです。</p>
-    <p>遊んでみて「もう1回」と思えたか、どのタイルの組み合わせが楽しかったかを教えてください。</p>
-    <div class="row"><span></span><button class="btn" id="again">もう一度遊ぶ</button></div>`);
-  $('again').onclick = () => { hideModal(); S = newRun(); render(); };
+  G.phase = 'win'; renderAll();
+  showModal(`<h2>全ステージクリア</h2>
+    <p>ボスを倒しました。試作版はここまでです。最後の盤面があなたの曲です。</p>
+    <p>遊んでみて「もう1回」と思えたか、音づくりが邪魔にならなかったかを教えてください。</p>
+    <div class="row"><button class="btn ghost" id="listenEnd">♪ 曲を聴く</button><button class="btn" id="again">もう一度遊ぶ</button></div>`);
+  $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.listening = true; G.step = -1; renderAll(); };
+  $('again').onclick = () => { hideModal(); keepKey(() => { G = newGame(); }); renderAll(); };
+}
+function keepKey(fn) { const r = G.root, s = G.scale, sp = G.speed; fn(); G.root = r; G.scale = s; G.speed = sp; }
+
+// ================= main loop =================
+let last = performance.now();
+function frame(now) {
+  const raw = Math.min(.1, (now - last) / 1000); last = now;
+  const dt = raw * G.speed;
+  if (G.phase === 'play') update(dt);
+  else if (G.listening) { G.acc += dt; while (G.acc >= STEP_DUR) { G.acc -= STEP_DUR; doStep(); } }
+  drawField(raw);
+  requestAnimationFrame(frame);
 }
 
-// ---------- boot ----------
-function start(data) {
-  S = newRun();
-  if (data && data.S && data.S.phase === 'build') { S = data.S; uid = data.uid || 1000; }
-  render();
-}
-try { window.claude?.hot?.snapshot?.(() => ({ S: S && S.phase === 'build' ? S : null, uid })); } catch (e) {}
-window.addEventListener('resize', () => highlightColumn());
-window.__loop = { get S() { return S; }, evalColumn, previewPass, DEFS, ROUNDS };
-if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+G = newGame();
+fillSelects();
+renderAll();
+window.__g = { get G() { return G; }, DEFS, STAGES, startStage, doStep, update };
+requestAnimationFrame(frame);
 })();
 </script>
