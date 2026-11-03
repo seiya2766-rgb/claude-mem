@@ -197,7 +197,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
 @media (min-width: 960px) {
   .app { max-width: 1180px; }
   .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
-  .side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); }
+  .side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); max-height: calc(100vh - 92px); overflow-y: auto; padding: 4px 6px 4px 4px; margin: -4px -6px -4px -4px; }
   canvas#field { height: clamp(150px, 24vh, 250px); }
   .keys { display: inline; }
   .app { padding-block: 10px 12px; }
@@ -236,6 +236,9 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .bar.groove > i { background: var(--lead); }
 .bar.fever > i { background: linear-gradient(90deg, var(--drum), var(--harm), var(--lead)); animation: blink .3s steps(2) infinite; }
 .album-row { align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.controls .keys { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell.cursor { outline: 3px dashed var(--fg); outline-offset: -4px; }
+.cell.held .tile { transform: translateY(-4px) scale(1.12); filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
 @media (max-width: 460px) {
   .offers, .offers.two { grid-template-columns: 1fr; }
@@ -535,7 +538,7 @@ function applyStatic() {
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   $('howto').innerHTML = t('ui.howto').map(x => `<li>${x}</li>`).join('');
 }
-function setLang(l) { LANG = l; SET.lang = l; store.set('settings', SET); applyStatic(); fillSelects(); renderAll(); }
+function setLang(l) { LANG = l; SET.lang = l; store.set('settings', SET); applyStatic(); fillSelects(); renderAll(); if (G.studio && G.phase === 'studio') studioBar($('coach')); }
 const langSelect = id => `<label class="check" for="${id}">${t('ui.lang')}
   <select id="${id}">${LANGS.map(l => `<option value="${l}" ${l === LANG ? 'selected' : ''}>${I18N[l]['meta.name']}</option>`).join('')}</select></label>`;
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
@@ -559,7 +562,7 @@ function nextToast() {
 
 const SAVE_KEYS = ['kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan'];
 function saveRun(pending, routeOpts) {
-  if (G && G.tutorial != null) return;
+  if (G && (G.tutorial != null || G.studio)) return;
   const o = { v: 1, uid, pending: pending || null, routeOpts: routeOpts || null };
   for (const k of SAVE_KEYS) o[k] = G[k];
   store.set('run', o);
@@ -738,6 +741,7 @@ const BGM = {
 };
 const BGM_IDS = Object.keys(BGM);
 function bgmPool() {
+  if (G.studio || G.album) return BGM_IDS;
   if (inTutorial()) return ['dawn', 'lofi', 'deep'];
   if (G.node === 'boss') return ['storm', 'neon', 'festival'];
   if (G.node === 'elite') return ['storm', 'deep', 'neon'];
@@ -1065,9 +1069,9 @@ function drawField(dt) {
   }
   cx.globalAlpha = 1;
   G.texts = G.texts.filter(t => t.life > 0);
-  if (G.phase === 'build' && !G.listening) {
+  if ((G.phase === 'build' || G.studio) && !G.listening) {
     cx.fillStyle = C.muted; cx.font = '500 13px ' + css('f-body'); cx.textAlign = 'center';
-    cx.fillText(t('f.idle', { node: nodeLabel() }), (CW - QUEUE_W) / 2 + 10, CH / 2);
+    cx.fillText(G.studio ? t('studio.field') : t('f.idle', { node: nodeLabel() }), (CW - QUEUE_W) / 2 + 10, CH / 2);
   }
 }
 
@@ -1124,6 +1128,8 @@ function stepUI() {
     c.classList.toggle('ph', running && s === G.step);
     c.classList.toggle('muted', s === G.muted);
     c.classList.toggle('hit', running && s === G.step && G.hits.includes(l));
+    c.classList.toggle('cursor', cursor.on && cursor.l === l && cursor.s === s);
+    c.classList.toggle('held', !!held && held.l === l && held.s === s);
   });
   $('overLabel').textContent = G.overheat > 0 ? t('b.overheat', { n: G.overheat }) : G.muted >= 0 ? t('b.sealed', { n: G.muted + 1 }) : '';
   renderNoise();
@@ -1147,7 +1153,7 @@ function renderTempo() {
 }
 // Spend one re-placement during a stage. Free while preparing.
 function spendEdit() {
-  if (G.phase === 'build') return true;
+  if (G.phase === 'build' || G.studio) return true;
   if (G.tempo >= 1) { G.tempo--; renderTempo(); return true; }
   const el = $('tempoLabel'); el.classList.remove('empty'); void el.offsetWidth; el.classList.add('empty');
   el.addEventListener('animationend', () => el.classList.remove('empty'), { once: true });
@@ -1160,20 +1166,35 @@ function renderLegend() {
 }
 function renderStatus() {
   renderTempo(); renderLegend();
-  $('stageLabel').textContent = `${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
+  $('stageLabel').textContent = G.studio ? t('studio.title') : `${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
+  $('lifeLabel').hidden = $('coinLabel').hidden = !!G.studio;
+  document.querySelector('.meters').hidden = !!G.studio;
+  document.querySelector('.keys').title = t('ui.keys');
   $('coinLabel').textContent = `◎ ${G.coins}`;
   $('lifeLabel').textContent = `♥ ${Math.max(0, G.life)}`;
   const rel = Object.keys(G.relics);
   $('relics').hidden = !rel.length;
   $('relics').innerHTML = rel.map(k => `<span class="relic" title="${RELICS[k].desc}">${RELICS[k].name}</span>`).join('');
-  $('playBtn').textContent = G.phase === 'play' ? t('ui.pause') : G.phase === 'paused' ? t('ui.resume') : t('ui.start');
-  $('playBtn').disabled = !['build', 'play', 'paused'].includes(G.phase) || (inTutorial() && G.tutorial < TUT_START_STEP);
+  $('playBtn').textContent = G.studio ? (G.listening ? t('studio.stop') : t('studio.play')) : G.phase === 'play' ? t('ui.pause') : G.phase === 'paused' ? t('ui.resume') : t('ui.start');
+  $('playBtn').disabled = !['build', 'play', 'paused', 'studio'].includes(G.phase) || (inTutorial() && G.tutorial < TUT_START_STEP);
+  $('listenBtn').hidden = !!G.studio;
   $('listenBtn').disabled = !['build', 'win'].includes(G.phase);
   $('listenBtn').textContent = G.listening ? t('ui.listenStop') : t('ui.listen');
   $('speedBtn').textContent = t('ui.speed', { n: G.speed });
 }
+const STARTER = [...new Set(Object.values(KITS).flatMap(k => k.hand))];
+// Tiles you have held in any run become available in the Studio palette.
+function recordSeen() {
+  if (G.studio || G.album || inTutorial()) return;
+  const seen = new Set(store.get('seenTiles', STARTER)); const n = seen.size;
+  for (const x of allTiles()) seen.add(x.id);
+  if (seen.size !== n) store.set('seenTiles', [...seen]);
+}
+const paletteIds = () => { const seen = new Set([...STARTER, ...store.get('seenTiles', [])]); return Object.keys(DEFS).filter(id => seen.has(id)); };
 function renderHand() {
   const el = $('hand');
+  recordSeen();
+  document.querySelector('#handZone .panel-title').textContent = G.studio ? t('studio.palette') : t('ui.hand');
   if (!G.hand.length) { el.innerHTML = `<span class="empty-hand">${t('h.allPlaced')}</span>`; return; }
   el.innerHTML = G.hand.map((t, i) =>
     `<button class="chip ${i === G.selHand ? 'sel' : ''}" data-i="${i}">${tileHTML(t.id)}<span>${tName(t)}</span></button>`).join('');
@@ -1211,7 +1232,7 @@ function renderInfo() {
     $('pUp') && ($('pUp').onclick = () => bump(1));
     $('pDown') && ($('pDown').onclick = () => bump(-1));
     $('pAuto') && ($('pAuto').onclick = () => { tl.p = null; ensureAudio(); playTile(tl, l, s); renderBoard(); renderInfo(); });
-    $('toHand').onclick = () => { if (!spendEdit()) return; G.board[l][s] = null; G.hand.push(tl); G.selCell = null; renderAll(); };
+    $('toHand').onclick = () => { if (returnToHand(l, s)) renderAll(); };
     return;
   }
   el.innerHTML = `<div>${t('i.idle')}</div>`;
@@ -1221,7 +1242,38 @@ function renderAll() { renderStatus(); renderBeats(); renderBoard(); renderHand(
 // ================= input =================
 // ---- drag & drop (pointer events: works for mouse and touch) ----
 let drag = null, suppressClick = false;
-const canEdit = () => ['build', 'play', 'paused'].includes(G.phase);
+const canEdit = () => ['build', 'play', 'paused', 'studio'].includes(G.phase);
+// One place for every board edit, used by mouse, touch, keyboard and gamepad.
+// In the Studio the hand is an endless palette and tiles knocked off the board just disappear.
+function placeFromHand(tile, l, s) {
+  const i = G.hand.indexOf(tile); if (i < 0 || !canEdit()) return false;
+  const cur = G.board[l][s];
+  if (!spendEdit()) return false;
+  G.hand.splice(i, 1);
+  if (G.studio) G.hand.splice(i, 0, mk(tile.id));
+  if (!G.studio && canMerge(tile, cur)) { cur.lv = 2; sfx('pick'); unlock('upgrade'); }
+  else { G.board[l][s] = tile; if (cur && !G.studio) G.hand.push(cur); }
+  G.selHand = -1; G.selCell = { l, s };
+  playTile(G.board[l][s], l, s);
+  return true;
+}
+function moveOnBoard(fl, fs, l, s) {
+  const tile = G.board[fl][fs], cur = G.board[l][s];
+  if (!tile || !canEdit() || (fl === l && fs === s)) return false;
+  if (!spendEdit()) return false;
+  if (!G.studio && canMerge(tile, cur)) { G.board[fl][fs] = null; cur.lv = 2; sfx('pick'); unlock('upgrade'); }
+  else { G.board[fl][fs] = cur; G.board[l][s] = tile; }
+  G.selHand = -1; G.selCell = { l, s };
+  playTile(G.board[l][s], l, s);
+  return true;
+}
+function returnToHand(l, s) {
+  const tile = G.board[l][s]; if (!tile || !canEdit()) return false;
+  if (!spendEdit()) return false;
+  G.board[l][s] = null; if (!G.studio) G.hand.push(tile);
+  G.selCell = null; G.selHand = -1;
+  return true;
+}
 document.addEventListener('pointerdown', e => {
   if (!canEdit() || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const cell = e.target.closest('#board .cell'), chip = e.target.closest('#hand .chip');
@@ -1269,28 +1321,12 @@ function endDrag(e, cancel) {
   suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
   if (cancel || !canEdit()) return;
   const t = dropTarget(e.clientX, e.clientY);
+  let ok = false;
   if (t?.cell) {
-    const cur = G.board[t.l][t.s];
-    if (d.from === 'board') {
-      if (G.board[d.l][d.s] !== d.tile || (d.l === t.l && d.s === t.s)) return;
-      if (!spendEdit()) return;
-      if (canMerge(d.tile, cur)) { G.board[d.l][d.s] = null; cur.lv = 2; sfx('pick'); unlock('upgrade'); }
-      else { G.board[d.l][d.s] = cur; G.board[t.l][t.s] = d.tile; }
-    } else {
-      const i = G.hand.indexOf(d.tile); if (i < 0) return;
-      if (!spendEdit()) return;
-      G.hand.splice(i, 1);
-      if (canMerge(d.tile, cur)) { cur.lv = 2; sfx('pick'); unlock('upgrade'); }
-      else { G.board[t.l][t.s] = d.tile; if (cur) G.hand.push(cur); }
-    }
-    G.selHand = -1; G.selCell = { l: t.l, s: t.s };
-    playTile(d.tile, t.l, t.s);
-  } else if (t?.hand && d.from === 'board') {
-    if (G.board[d.l][d.s] !== d.tile) return;
-    if (!spendEdit()) return;
-    G.board[d.l][d.s] = null; G.hand.push(d.tile); G.selCell = null; G.selHand = -1;
-  } else return;
-  renderBoard(); renderHand(); renderInfo();
+    if (d.from === 'board') ok = G.board[d.l][d.s] === d.tile && moveOnBoard(d.l, d.s, t.l, t.s);
+    else ok = placeFromHand(d.tile, t.l, t.s);
+  } else if (t?.hand && d.from === 'board') ok = G.board[d.l][d.s] === d.tile && returnToHand(d.l, d.s);
+  if (ok) { renderBoard(); renderHand(); renderInfo(); }
 }
 document.addEventListener('pointerup', e => endDrag(e, false));
 document.addEventListener('pointercancel', e => endDrag(e, true));
@@ -1298,16 +1334,11 @@ document.addEventListener('pointercancel', e => endDrag(e, true));
 boardEl.addEventListener('click', e => {
   if (suppressClick) return;
   const c = e.target.closest('.cell'); if (!c) return;
-  if (!['build', 'play', 'paused'].includes(G.phase)) return;
+  if (!canEdit()) return;
   ensureAudio();
   const l = +c.dataset.l, s = +c.dataset.s, cur = G.board[l][s];
   if (G.selHand >= 0) {
-    if (!spendEdit()) return;
-    const t = G.hand.splice(G.selHand, 1)[0];
-    if (canMerge(t, cur)) { cur.lv = 2; sfx('pick'); unlock('upgrade'); G.selHand = -1; G.selCell = { l, s }; renderBoard(); renderHand(); renderInfo(); return; }
-    G.board[l][s] = t; if (cur) G.hand.push(cur);
-    G.selHand = -1; G.selCell = { l, s };
-    playTile(t, l, s);
+    if (!placeFromHand(G.hand[G.selHand], l, s)) return;
   } else if (cur) {
     G.selCell = G.selCell && G.selCell.l === l && G.selCell.s === s ? null : { l, s };
     if (G.selCell) playTile(cur, l, s);
@@ -1323,6 +1354,7 @@ $('hand').addEventListener('click', e => {
 });
 $('playBtn').addEventListener('click', () => {
   ensureAudio();
+  if (G.studio) { G.listening = !G.listening; G.step = -1; G.acc = 0; G.hits = []; renderStatus(); stepUI(); return; }
   if (G.phase === 'build') startStage();
   else if (G.phase === 'play') { G.phase = 'paused'; renderStatus(); }
   else if (G.phase === 'paused') { G.phase = 'play'; renderStatus(); }
@@ -1485,17 +1517,37 @@ function showEvent() {
 // ================= album =================
 // Every finished run keeps its final board as a song that can be replayed from the title screen.
 function saveAlbum(result) {
-  if (!G.board.flat().some(Boolean)) return;
+  if (!G.board.flat().some(Boolean)) return false;
   const list = store.get('album', []);
-  list.unshift({ d: Date.now(), kit: G.kit, rank: G.rank, result, col: G.col, board: JSON.parse(JSON.stringify(G.board)), root: G.root, scale: G.scale, bgm: currentBgm() });
+  list.unshift({ d: Date.now(), kit: G.kit, rank: G.rank, result, col: G.col, board: JSON.parse(JSON.stringify(G.board)), root: G.root, scale: G.scale, bgm: currentBgm(), bpm: G.bpm || 100 });
   store.set('album', list.slice(0, 24));
+  return true;
+}
+// ================= studio =================
+// Free composing: no enemies, endless palette of every tile you have unlocked, adjustable tempo.
+function startStudio() {
+  ensureAudio(); hideModal();
+  keepKey(() => { G = newGame('rhythm', 0); });
+  G.studio = true; G.phase = 'studio'; G.plan = []; G.bpm = 100; G.hand = paletteIds().map(mk);
+  fillSelects(); renderAll();
+}
+function studioBar(el) {
+  const total = Object.keys(DEFS).length, have = paletteIds().length;
+  el.innerHTML = `<div class="row"><b>${t('studio.title')}</b><button class="btn ghost small" id="stTitle">${t('set.toTitle')}</button></div>
+    <div class="setting"><label for="bpm">${t('studio.bpm')}</label><input type="range" id="bpm" min="60" max="160" step="2" value="${G.bpm}"><output id="bpmOut">${G.bpm}</output></div>
+    <div class="row"><span class="hint">${t('studio.unlocked', { a: have, b: total })}</span>
+      <span class="row" style="gap:6px"><button class="btn ghost small" id="stClear">${t('studio.clear')}</button><button class="btn small" id="stSave">${t('studio.save')}</button></span></div>`;
+  $('bpm').oninput = e => { G.bpm = +e.target.value; $('bpmOut').textContent = G.bpm; };
+  $('stClear').onclick = () => { G.board = Array.from({ length: LANES }, () => Array(STEPS).fill(null)); G.selCell = null; renderAll(); };
+  $('stSave').onclick = () => { if (saveAlbum('studio')) { toastQ.push(t('studio.saved')); if (toastQ.length === 1) nextToast(); } };
+  $('stTitle').onclick = () => { G.listening = false; showStart(); };
 }
 function showAlbum(back) {
   const list = store.get('album', []);
   const fmt = d => new Date(d).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : LANG, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   showModal(`<h2>${t('al.title')}</h2><p>${list.length ? t('al.note') : t('al.empty')}</p>
     <div class="ach-list">${list.map((e, i) => `<div class="row album-row">
-      <span><b>${fmt(e.d)}</b>　${KITS[e.kit].name}・${e.result === 'win' ? t('al.win') : t('al.lose', { c: e.col + 1, n: ROUTE_LEN })}<br>
+      <span><b>${fmt(e.d)}</b>　${e.result === 'studio' ? t('al.studio') : KITS[e.kit].name + '・' + (e.result === 'win' ? t('al.win') : t('al.lose', { c: e.col + 1, n: ROUTE_LEN }))}<br>
       <small class="hint">${NOTE_NAMES[e.root]} ${SCALES[e.scale].name}・BGM ${t('bgm.' + e.bgm + '.name')}</small></span>
       <button class="btn ghost small" data-al="${i}">${t('al.play')}</button></div>`).join('')}</div>
     <div class="row"><span></span><button class="btn" id="alBack">${t('a.back')}</button></div>`);
@@ -1505,7 +1557,7 @@ function showAlbum(back) {
 function playAlbum(e) {
   ensureAudio(); hideModal();
   keepKey(() => { G = newGame(e.kit, 0); });
-  G.board = JSON.parse(JSON.stringify(e.board)); G.root = e.root; G.scale = e.scale; G.bgm = e.bgm; G.album = true;
+  G.board = JSON.parse(JSON.stringify(e.board)); G.root = e.root; G.scale = e.scale; G.bgm = e.bgm; G.album = true; G.bpm = e.bpm || 100;
   G.phase = 'win'; G.listening = true; G.step = -1; G.acc = 0;
   fillSelects(); renderAll();
 }
@@ -1562,10 +1614,11 @@ function showStart() {
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
       ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
-      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
+      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
     $('alBtn').onclick = () => showAlbum(draw);
+    $('stBtn').onclick = startStudio;
     $('tutBtn').onclick = () => { ensureAudio(); startTutorial(); };
     $('langStart').onchange = e => { setLang(e.target.value); draw(); };
     $('kits').onclick = e => { const b = e.target.closest('[data-kit]'); if (b) { kit = b.dataset.kit; draw(); } };
@@ -1606,8 +1659,77 @@ function showMenu() {
 }
 function closeMenu() { menuOpen = false; hideModal(); renderStatus(); }
 $('menuBtn').addEventListener('click', () => { ensureAudio(); showMenu(); });
+// ================= keyboard / gamepad cursor =================
+// Arrow keys or the d-pad move a cursor over the board; the same actions drive menus, so the game is playable without a mouse.
+let cursor = { l: 1, s: 0, on: false }, held = null;
+function refreshAll() { renderBoard(); renderHand(); renderInfo(); }
+function act(a) {
+  ensureAudio();
+  if (!$('overlay').hidden) return modalNav(a);
+  const dirs = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+  if (dirs[a]) { cursor.on = true; cursor.l = (cursor.l + dirs[a][0] + LANES) % LANES; cursor.s = (cursor.s + dirs[a][1] + STEPS) % STEPS; stepUI(); return; }
+  const { l, s } = cursor;
+  if (a === 'ok') {
+    cursor.on = true; if (!canEdit()) return;
+    if (G.selHand >= 0) placeFromHand(G.hand[G.selHand], l, s);
+    else if (held) { if (held.l !== l || held.s !== s) moveOnBoard(held.l, held.s, l, s); held = null; }
+    else if (G.board[l][s]) { held = { l, s }; G.selCell = { l, s }; playTile(G.board[l][s], l, s); }
+    refreshAll();
+  } else if (a === 'back') {
+    if (held || G.selHand >= 0) { held = null; G.selHand = -1; refreshAll(); }
+  } else if (a === 'remove') { held = null; if (returnToHand(l, s)) renderAll(); }
+  else if (a === 'prevTile' || a === 'nextTile') {
+    if (!G.hand.length || !canEdit()) return;
+    const n = G.hand.length; held = null; G.selCell = null;
+    G.selHand = G.selHand < 0 ? 0 : (G.selHand + (a === 'nextTile' ? 1 : -1) + n) % n;
+    refreshAll();
+  } else if (a === 'pitchUp' || a === 'pitchDown') {
+    const tl = G.board[l][s]; if (!tl || DEFS[tl.id].reg == null) return;
+    tl.p = tileDeg(tl, l, s) + (a === 'pitchUp' ? 1 : -1); playTile(tl, l, s); unlock('composer');
+    G.selCell = { l, s }; refreshAll();
+  } else if (a === 'start') $('playBtn').click();
+  else if (a === 'menu') { if (menuOpen) closeMenu(); else showMenu(); }
+  else if (a === 'listen') $('listenBtn').click();
+}
+function modalNav(a) {
+  const items = [...$('modal').querySelectorAll('button:not([disabled]), select, input')].filter(x => x.offsetParent !== null);
+  if (!items.length) return;
+  const el = document.activeElement, i = items.indexOf(el);
+  if (el && el.type === 'range' && (a === 'left' || a === 'right')) {
+    el.value = +el.value + (a === 'right' ? 1 : -1) * (+el.step || 1); el.dispatchEvent(new Event('input')); return;
+  }
+  if (el && el.tagName === 'SELECT' && (a === 'left' || a === 'right')) {
+    el.selectedIndex = (el.selectedIndex + (a === 'right' ? 1 : -1) + el.options.length) % el.options.length; el.dispatchEvent(new Event('change')); return;
+  }
+  if (['up', 'left', 'prevTile'].includes(a)) items[i <= 0 ? items.length - 1 : i - 1].focus();
+  else if (['down', 'right', 'nextTile'].includes(a)) items[(i + 1) % items.length].focus();
+  else if (a === 'ok') (items[i] || items[0]).click();
+  else if (a === 'back' || a === 'menu') { if (menuOpen) closeMenu(); }
+}
+const PAD = { 0: 'ok', 1: 'back', 2: 'remove', 3: 'listen', 4: 'prevTile', 5: 'nextTile', 6: 'pitchDown', 7: 'pitchUp', 8: 'menu', 9: 'start', 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+let padPrev = {}, padNext = {};
+function pollGamepad(now) {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of pads) {
+    if (!gp) continue;
+    const on = {};
+    gp.buttons.forEach((b, i) => { if (PAD[i] && b.pressed) on[PAD[i]] = true; });
+    const [ax = 0, ay = 0] = gp.axes;
+    if (ax < -.5) on.left = true; if (ax > .5) on.right = true; if (ay < -.5) on.up = true; if (ay > .5) on.down = true;
+    for (const a in on) {
+      if (!padPrev[a]) { act(a); padNext[a] = now + 350; }
+      else if (['up', 'down', 'left', 'right'].includes(a) && now > padNext[a]) { act(a); padNext[a] = now + 120; }
+    }
+    padPrev = on; return;
+  }
+}
+window.addEventListener('gamepadconnected', () => { toastQ.push(t('pad.connected')); if (toastQ.length === 1) nextToast(); });
+const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok', Backspace: 'remove', Delete: 'remove',
+  q: 'prevTile', Q: 'prevTile', e: 'nextTile', E: 'nextTile', '[': 'pitchDown', ']': 'pitchUp' };
 document.addEventListener('keydown', e => {
-  if (e.target.closest('input, select, textarea')) return;
+  const inField = e.target.closest('input, select, textarea');
+  if (KEYS[e.key] && !(inField && $('overlay').hidden)) { e.preventDefault(); act(KEYS[e.key]); return; }
+  if (inField) return;
   if (e.key === 'Escape') { e.preventDefault(); if (menuOpen) closeMenu(); else if ($('overlay').hidden) showMenu(); return; }
   if (!$('overlay').hidden) return;
   if (e.key === ' ') { e.preventDefault(); if (e.target.blur) e.target.blur(); $('playBtn').click(); }
@@ -1646,6 +1768,7 @@ function tutCheck() {
 }
 function tutRender() {
   const el = $('coach');
+  if (G && G.studio && G.phase === 'studio') { el.hidden = false; if (!el.querySelector('#bpm')) studioBar(el); applySpots(); return; }
   if (G && G.album) {
     el.hidden = false;
     el.innerHTML = `<div class="row"><b>${t('al.playing')}</b><button class="btn small" id="alStop">${t('al.stop')}</button></div><div class="hint">${t('al.playingNote')}</div>`;
@@ -1686,7 +1809,8 @@ function frame(now) {
   const raw = Math.min(.1, (now - last) / 1000); last = now;
   const dt = raw * G.speed;
   if (G.phase === 'play') update(dt);
-  else if (G.listening) { G.acc += dt; while (G.acc >= STEP_DUR) { G.acc -= STEP_DUR; doStep(); } }
+  else if (G.listening) { const sd = STEP_DUR * 100 / (G.bpm || 100); G.acc += dt; while (G.acc >= sd) { G.acc -= sd; doStep(); } }
+  pollGamepad(now);
   idleBgm(dt);
   drawField(raw);
   drawViz();
