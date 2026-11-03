@@ -189,7 +189,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
 @media (max-width: 959px) {
   .main, .side { display: contents; }
   .bgm { order: 8; }
-  .coach { order: 1; } .relics { order: 2; } .meter { order: 3; } .stage { order: 4; } .controls { order: 5; }
+  .coach { order: 1; } .relics { order: 2; } .meters { order: 3; } .stage { order: 4; } .controls { order: 5; }
   #handZone { order: 6; position: sticky; bottom: 0; z-index: 6; background: var(--bg); border-top: 1px solid var(--line);
     padding-block: 8px max(8px, env(safe-area-inset-bottom, 0px)); border-radius: 0; }
   #info { order: 7; } .sound { order: 8; } details { order: 9; } .proto { order: 10; }
@@ -200,7 +200,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
   .side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); }
   canvas#field { height: clamp(150px, 24vh, 250px); }
   .keys { display: inline; }
-  .app { padding-block: 14px 20px; }
+  .app { padding-block: 10px 12px; }
   #board .cell { aspect-ratio: auto; height: clamp(36px, 6.6vh, 72px); }
   #board .cell .tile { width: auto; height: 74%; aspect-ratio: 1; }
 }
@@ -232,6 +232,10 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .bgm-chip[aria-pressed="true"] { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
 .bgm-chip .rec { color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .cell.hit .tile { filter: brightness(1.2) drop-shadow(0 0 6px var(--lead)); }
+.meters { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+.bar.groove > i { background: var(--lead); }
+.bar.fever > i { background: linear-gradient(90deg, var(--drum), var(--harm), var(--lead)); animation: blink .3s steps(2) infinite; }
+.album-row { align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
 @media (max-width: 460px) {
   .offers, .offers.two { grid-template-columns: 1fr; }
@@ -255,9 +259,15 @@ canvas#viz { width: 100%; height: 22px; display: block; }
   <div class="main">
   <div class="relics" id="relics" hidden></div>
 
-  <div class="meter">
-    <div class="meter-label"><span data-i18n="ui.noise"></span><b id="noiseText">0 / 30</b></div>
-    <div class="bar" id="noiseBar"><i></i></div>
+  <div class="meters">
+    <div class="meter">
+      <div class="meter-label"><span data-i18n="ui.noise"></span><b id="noiseText">0 / 30</b></div>
+      <div class="bar" id="noiseBar"><i></i></div>
+    </div>
+    <div class="meter">
+      <div class="meter-label"><span data-i18n="ui.groove"></span><b id="grooveText">0%</b></div>
+      <div class="bar groove" id="grooveBar"><i></i></div>
+    </div>
   </div>
 
   <section class="stage">
@@ -344,7 +354,9 @@ const ENEMIES = {
   stealth: { hp: 4,   speed: .1,   dmg: 1, armor: 0, r: 7,  shape: 'circle', stealth: true },
   split:   { hp: 6,   speed: .07,  dmg: 2, armor: 0, r: 9,  shape: 'split' },
   mini:    { hp: 2,   speed: .09,  dmg: 1, armor: 0, r: 5,  shape: 'circle' },
-  boss:    { hp: 260, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex' },
+  boss:    { hp: 260, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex', boss: true },
+  queen:   { hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'crown', boss: true },
+  reverser:{ hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'hourglass', boss: true },
 };
 const tempoMax = () => (G && G.relics.metronome ? 5 : 3) + (G && G.kit === 'rhythm' ? 1 : 0);
 
@@ -357,7 +369,8 @@ const UNLOCK = [['shield'], ['mirror'], ['dash', 'stealth'], ['block'], ['split'
 function makePlan(depth, kind) {
   const list = [];
   if (kind === 'boss') {
-    list.push({ t: 2, type: 'boss', lanes: [1] });
+    const bt = ['boss', 'queen', 'reverser'][Math.floor(Math.random() * 3)];
+    list.push({ t: 2, type: bt, lanes: [1] });
     wave(list, 'dot', 12, 6, 3, ALL); wave(list, 'dash', 6, 15, 5, ALL); wave(list, 'shield', 4, 10, 7, ALL); wave(list, 'stealth', 4, 20, 6, ALL);
   } else {
     const lanes = depth === 0 ? [1, 2] : ALL;
@@ -379,6 +392,7 @@ function makePlan(depth, kind) {
 }
 const ROUTE_LEN = 9; // 8 columns + boss
 const NODES = {
+  event:  {},
   battle: {},
   elite:  {},
   shop:   {},
@@ -388,7 +402,7 @@ const NODES = {
 function makeColumn(c) {
   if (c === 0) return ['battle'];
   if (c === ROUTE_LEN - 1) return ['boss'];
-  const extra = ['shop', ...(c >= 2 ? ['elite', 'rest'] : [])];
+  const extra = ['shop', 'event', ...(c >= 2 ? ['elite', 'rest'] : [])];
   const k = Math.random() < .5 ? 2 : 1;
   return ['battle', ...pick(extra, k)];
 }
@@ -403,7 +417,7 @@ const RELICS = {
   reverb:   {},
   limiter:  {},
 };
-const PRICES = { kick: 3, snare: 3, hat: 2, bass: 3, cymbal: 4, chord: 5, lead: 5, echo: 5, cresc: 5, ghost: 5, rest: 4, dist: 6, feedback: 6 };
+const PRICES = { kick: 3, snare: 3, hat: 2, bass: 3, cymbal: 4, chord: 5, lead: 5, echo: 5, cresc: 5, ghost: 5, rest: 4, dist: 6, feedback: 6, tom: 4, maracas: 3, arp: 5, pad: 5, sync: 4 };
 const RELIC_PRICE = 9;
 
 // Tiles. fire(c) does the gameplay; reg/auto define the default sound only.
@@ -435,8 +449,18 @@ const DEFS = {
            fire: c => c.hitFront(c.lane, 1 + Math.floor(c.noise / 3)) },
   rest:  { cat: 'fx', shape: 'ring', reg: null, noise: -3, silent: true,
            fire: () => {} },
+  tom:   { cat: 'drum', shape: 'circle', reg: null, noise: 0,
+           fire: c => { for (const l of [c.lane - 1, c.lane, c.lane + 1]) if (l >= 0 && l < LANES) c.hitFront(l, 2 + c.drumBonus); } },
+  maracas: { cat: 'drum', shape: 'ring', reg: null, noise: 0,
+           fire: c => { c.hitFront(c.lane, 1 + c.drumBonus); c.hitFront(c.lane, 1 + c.drumBonus); } },
+  arp:   { cat: 'lead', shape: 'diamond', reg: 72, noise: 1,
+           fire: c => { pick([0, 1, 2, 3], 3).forEach(l => c.hitFront(l, 2)); } },
+  pad:   { cat: 'harm', shape: 'tri', reg: 57, noise: 1,
+           fire: c => { c.hitAll(c.lane, 1); for (let k = 1; k < 4; k++) c.later(k, () => c.hitAll(c.lane, 1)); } },
+  sync:  { cat: 'lead', shape: 'square', reg: 64, noise: 0,
+           fire: c => c.hitFront(c.lane, c.step % 2 === 1 ? 6 : 2) },
 };
-const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest'];
+const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest', 'tom', 'maracas', 'arp', 'pad', 'sync'];
 const KITS = {
   rhythm:  { hand: ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'], life: 10 },
   harmony: { hand: ['chord', 'lead', 'lead', 'bass', 'bass', 'hat'], life: 10 },
@@ -459,7 +483,7 @@ function newGame(kit = 'rhythm', rank = 0) {
   const maxLife = KITS[kit].life - (rank >= 4 ? 2 : 0);
   return {
     kit, rank, maxLife,
-    stats: { kills: 0, dmg: 0, maxHit: 0, overheats: 0, coins: 0, battles: 0 },
+    stats: { kills: 0, dmg: 0, maxHit: 0, overheats: 0, coins: 0, battles: 0, fevers: 0 },
     col: 0, node: 'battle', coins: 0, life: maxLife, relics: {},
     board: Array.from({ length: LANES }, () => Array(STEPS).fill(null)),
     hand: KITS[kit].hand.map(mk),
@@ -473,7 +497,7 @@ function newGame(kit = 'rhythm', rank = 0) {
 function freshStage() {
   return { t: 0, acc: 0, step: -1, stepCount: 0, loop: 0, noise: 0, overheat: 0,
            enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
-           muted: -1, mutedLeft: 0, hits: [], tempo: tempoMax() };
+           muted: -1, mutedLeft: 0, hits: [], tempo: tempoMax(), dir: 1, groove: 0, fever: 0, stepHits: 0 };
 }
 const noiseMax = () => (G.relics.gate ? 42 : 30) + (G.kit === 'noise' ? 10 : 0);
 
@@ -516,7 +540,7 @@ const langSelect = id => `<label class="check" for="${id}">${t('ui.lang')}
   <select id="${id}">${LANGS.map(l => `<option value="${l}" ${l === LANG ? 'selected' : ''}>${I18N[l]['meta.name']}</option>`).join('')}</select></label>`;
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
-const ACHS = ['first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
+const ACHS = ['fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
 const achGot = new Set(store.get('ach', []));
 const toastQ = [];
 function unlock(id) {
@@ -609,7 +633,7 @@ const midiName = m => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1
 function autoDeg(id, lane, step) {
   const n = SCALES[G.scale].s.length;
   const prog = Math.round(PROG[step] * n / 5);
-  if (id === 'lead' || id === 'echo' || id === 'ghost' || id === 'feedback') return prog + (LANES - 1 - lane);
+  if (['lead', 'echo', 'ghost', 'feedback', 'arp', 'sync'].includes(id)) return prog + (LANES - 1 - lane);
   return prog;
 }
 const tileDeg = (t, lane, step) => t.p ?? autoDeg(t.id, lane, step);
@@ -633,6 +657,11 @@ function playTile(t, lane, step, at) {
     case 'dist': osc('sawtooth', f, time, .16, .28, .004, 1800); osc('sawtooth', fifth, time, .12, .28, .004, 1800); break;
     case 'ghost': osc('sine', f, time, .1, .5, .08); break;
     case 'feedback': osc('square', f, time, .05, .12); break;
+    case 'tom': { const o = osc('sine', 180, time, .5, .3); o.frequency.exponentialRampToValueAtTime(90, time + .2); break; }
+    case 'maracas': noiseHit(time, 'highpass', 9000, .12, .03); noiseHit(time + STEP_DUR / G.speed / 2, 'highpass', 9000, .08, .03); break;
+    case 'arp': [0, 2, 4].forEach((i, k) => osc('square', mtof(degToMidi(d.reg, deg + i)), time + k * STEP_DUR / G.speed / 3, .05, .1, .003, 3000)); break;
+    case 'pad': [0, 2, 4].forEach(i => osc('sine', mtof(degToMidi(d.reg, deg + i)), time, .045, STEP_DUR * 4 / G.speed, .1)); break;
+    case 'sync': osc('triangle', f, time, .12, .15, .002); break;
   }
 }
 function sfx(kind) {
@@ -646,6 +675,7 @@ function sfxInner(kind) {
   if (kind === 'over') { noiseHit(t, 'lowpass', 900, .4, .9); }
   if (kind === 'fail') { const o = osc('sawtooth', 220, t, .2, 1.1, .01, 900); o.frequency.exponentialRampToValueAtTime(40, t + 1.1); }
   if (kind === 'pick') osc('sine', 1320, t, .12, .12);
+  if (kind === 'fever') [0, 2, 4, 7, 9].forEach((i, k) => osc('square', mtof(degToMidi(72, i)), t + k * .05, .06, .25, .003, 3200));
 }
 
 // ================= BGM =================
@@ -721,6 +751,7 @@ function recommendBgm() {
   return pool.find(id => BGM[id].aff[0] === G.scale) || pool.find(id => BGM[id].aff.includes(G.scale)) || pool[0];
 }
 function currentBgm() {
+  if (G.album) return G.bgm;
   const key = `${G.col}:${G.node}:${inTutorial()}`;
   if (G.bgmKey !== key) {
     G.bgmKey = key;
@@ -735,7 +766,7 @@ function bgmIntensity() {
   const n = G.enemies.length; let minX = 1; for (const e of G.enemies) minX = Math.min(minX, e.x);
   let I = n >= 2 ? 1 : 0;
   if (n >= 5 || minX < .4) I = 2;
-  if (n >= 8 || minX < .2 || G.enemies.some(e => e.type === 'boss')) I = 3;
+  if (n >= 8 || minX < .2 || G.enemies.some(e => ENEMIES[e.type].boss) || G.fever > 0) I = 3;
   if (G.node === 'elite') I = Math.min(3, I + 1);
   return I;
 }
@@ -789,6 +820,7 @@ function damage(e, amount, color, src) {
   }
   const d = Math.max(1, Math.round(amount) - e.armor);
   e.hp -= d; e.flash = .12;
+  G.stepHits = (G.stepHits || 0) + 1;
   G.stats.dmg += d; G.stats.maxHit = Math.max(G.stats.maxHit, d); if (e.hp <= 0) G.stats.kills++;
   if (d >= 40) unlock('big_hit');
   G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
@@ -808,13 +840,13 @@ function makeCtx(lane, step, mul, color, src, lv = 1) {
     hitBack: (l, d) => damage(backmost(l, src), d * mul, color, src),
     hitAll: (l, d) => { for (const e of G.enemies.filter(e => e.lane === l && targetable(e, src))) damage(e, d * mul, color, src); },
     slow: (l, s) => { for (const e of G.enemies) if (e.lane === l) e.slow = Math.max(e.slow, s); G.fx.push({ kind: 'lane', lane: l, color, life: .25, max: .25 }); },
-    knock: (l, a) => { const e = frontmost(l, src); if (e && ENEMIES[e.type].stealth) e.revealed = true; if (e && e.type !== 'boss') { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
+    knock: (l, a) => { const e = frontmost(l, src); if (e && ENEMIES[e.type].stealth) e.revealed = true; if (e && !ENEMIES[e.type].boss) { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
     later: (n, fn) => G.delayed.push({ at: G.stepCount + n, fn }),
   };
 }
 function spawn(type, lane, x = 1) {
   const T = ENEMIES[type];
-  const hp = Math.round(T.hp * (G.rank >= 1 ? 1.2 : 1) * (type === 'boss' && G.rank >= 5 ? 1.3 : 1));
+  const hp = Math.round(T.hp * (G.rank >= 1 ? 1.2 : 1) * (ENEMIES[type].boss && G.rank >= 5 ? 1.3 : 1));
   G.enemies.push({ type, lane, x, revealed: false, hp, max: hp, speed: T.speed * (G.rank >= 3 ? 1.1 : 1), dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
 }
 function startStage() {
@@ -824,8 +856,9 @@ function startStage() {
   renderAll();
 }
 function doStep() {
-  G.step = (G.step + 1) % STEPS;
+  G.step = (G.step + (G.dir || 1) + STEPS) % STEPS;
   G.stepCount++;
+  G.stepHits = 0;
   if (G.step === 0 && G.stepCount > 1) {
     G.loop++;
     if (G.phase === 'play' && G.tempo < tempoMax()) { G.tempo++; renderTempo(); }
@@ -852,6 +885,7 @@ function doStep() {
   const chordMul = col.filter(c => c.t.id === 'chord').reduce((m, c) => m * (c.t.lv === 2 ? 3 : 2), 1);
   let mulBase = 1;
   if (G.relics.downbeat && (G.step === 0 || G.step === 4)) mulBase *= 2;
+  if (G.fever > 0) mulBase *= 1.5;
   const t0 = ac ? ac.currentTime + .01 : 0;
   for (const c of col) {
     const d = DEFS[c.t.id];
@@ -862,6 +896,15 @@ function doStep() {
     G.noise = Math.max(0, G.noise + (G.phase === 'play' ? dn : 0));
     if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
   }
+  if (G.phase === 'play') {
+    // Groove: landing hits beat after beat fills it; at 100% the band goes into FEVER for two bars.
+    if (G.fever > 0) { G.fever--; if (!G.fever) G.groove = 0; }
+    else if (G.stepHits > 0) {
+      G.groove = Math.min(100, G.groove + 5 + 3 * Math.min(3, G.stepHits));
+      if (G.groove >= 100) { G.fever = 16; G.stats.fevers = (G.stats.fevers || 0) + 1; sfx('fever'); unlock('fever');
+        G.texts.push({ lane: 1, x: .5, txt: t('f.fever'), life: 1.6, warn: true }); }
+    } else if (col.length && G.enemies.length) G.groove = Math.max(0, G.groove - 1);
+  }
   if (ac) bgmStep(G.step, G.stepCount, t0);
   G.pulse = G.hits.length ? 1 : G.step % 4 === 0 ? .6 : G.pulse;
   if (G.phase === 'play' && G.noise >= noiseMax()) {
@@ -871,9 +914,22 @@ function doStep() {
   stepUI();
 }
 function bossLogic() {
-  const boss = G.enemies.find(e => e.type === 'boss' && e.hp > 0);
-  if (!boss) return;
-  // every 2 bars: jump lane and mute a random beat for one bar
+  const boss = G.enemies.find(e => ENEMIES[e.type].boss && e.hp > 0);
+  if (!boss) { G.dir = 1; return; }
+  const rl = () => Math.floor(Math.random() * LANES);
+  if (boss.type === 'queen') {
+    // Noise Queen: adds noise every bar and summons mirrors.
+    if (G.step === 0 && G.loop > 0) { G.noise += 3; G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.queen'), life: 1.2, warn: true }); }
+    if (G.stepCount % 12 === 0) spawn('mirror', rl());
+    return;
+  }
+  if (boss.type === 'reverser') {
+    // The Reverser: flips the playhead direction every two bars.
+    if (G.step === 0 && G.loop > 0 && G.loop % 2 === 0) { G.dir = -(G.dir || 1); G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.reverse'), life: 1.6, warn: true }); boss.lane = rl(); }
+    if (G.stepCount % 10 === 0) spawn('dash', rl());
+    return;
+  }
+  // Tempo Thief: every 2 bars, jump lane and mute a random beat for one bar
   if (G.step === 0 && G.loop > 0 && G.loop % 2 === 0) {
     boss.lane = Math.floor(Math.random() * LANES);
     G.muted = Math.floor(Math.random() * STEPS); G.mutedLeft = STEPS;
@@ -891,7 +947,7 @@ function update(dt) {
     const sp = e.speed * (e.slow > 0 ? .45 : 1);
     e.x -= sp * dt; e.slow = Math.max(0, e.slow - dt); e.flash = Math.max(0, e.flash - dt);
     if (e.x <= 0) {
-      e.hp = 0; G.life -= e.dmg; sfx('hurt');
+      e.hp = 0; G.life -= e.dmg; sfx('hurt'); G.groove = Math.max(0, G.groove - 30);
       G.fx.push({ kind: 'hurt', lane: e.lane, life: .4, max: .4 });
       if (SET.shake) { cv.classList.remove('hurt'); void cv.offsetWidth; cv.classList.add('hurt'); }
       renderStatus();
@@ -929,6 +985,8 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   else if (shape === 'square') cx.rect(x - r, y - r, r * 2, r * 2);
   else if (shape === 'mirror') { cx.moveTo(x, y - r); cx.lineTo(x + r, y); cx.lineTo(x, y + r); cx.lineTo(x - r, y); cx.closePath(); }
   else if (shape === 'shield') cx.arc(x + 2, y, r * .8, 0, Math.PI * 2);
+  else if (shape === 'crown') { cx.moveTo(x - r, y + r * .7); cx.lineTo(x - r, y - r * .5); cx.lineTo(x - r * .5, y); cx.lineTo(x, y - r); cx.lineTo(x + r * .5, y); cx.lineTo(x + r, y - r * .5); cx.lineTo(x + r, y + r * .7); cx.closePath(); }
+  else if (shape === 'hourglass') { cx.moveTo(x - r, y - r); cx.lineTo(x + r, y - r); cx.lineTo(x - r, y + r); cx.lineTo(x + r, y + r); cx.closePath(); }
   else if (shape === 'split') { cx.arc(x - r * .4, y, r * .62, 0, Math.PI * 2); cx.moveTo(x + r * .4 + r * .62, y); cx.arc(x + r * .4, y, r * .62, 0, Math.PI * 2); }
   else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
   cx.fill();
@@ -938,7 +996,7 @@ function drawShape(shape, x, y, r, C, opt = {}) {
 }
 function drawField(dt) {
   if (!CW) sizeCanvas();
-  const C = { bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
+  const C = { lead: css('lead'), bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
               drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') };
   cx.clearRect(0, 0, CW, CH);
   const lh = CH / LANES;
@@ -947,6 +1005,7 @@ function drawField(dt) {
     cx.fillStyle = C.muted; cx.font = '600 11px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.fillText(String(l + 1), 9, laneY(l));
   }
+  if (G.fever > 0) { cx.fillStyle = C.lead; cx.globalAlpha = .07 + .05 * (G.pulse || 0); cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; }
   // speaker / base line
   const pw = 3 + (G.pulse || 0) * 4;
   cx.fillStyle = C.fg; cx.fillRect(BASE_X - 2 - pw / 2 - 1, 4, pw, CH - 8);
@@ -982,7 +1041,7 @@ function drawField(dt) {
     const k = perLane[o.lane]++;
     const soon = G.phase === 'build' ? o.t / 8 : (o.t - G.t) / 6;
     cx.globalAlpha = 1 - Math.max(0, Math.min(1, soon)) * .65;
-    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), o.type === 'boss' ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth });
+    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), ENEMIES[o.type].boss ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth });
   }
   cx.globalAlpha = 1;
   // enemies
@@ -1075,6 +1134,10 @@ function renderNoise() {
   $('noiseText').textContent = `${Math.round(G.noise)} / ${m}`;
   $('noiseBar').firstElementChild.style.width = Math.min(100, G.noise / m * 100) + '%';
   $('noiseBar').classList.toggle('hot', G.noise >= m * .75 || G.overheat > 0);
+  const gv = G.fever > 0 ? 100 : Math.round(G.groove || 0);
+  $('grooveText').textContent = G.fever > 0 ? t('f.fever') : gv + '%';
+  $('grooveBar').firstElementChild.style.width = gv + '%';
+  $('grooveBar').classList.toggle('fever', G.fever > 0);
 }
 function renderTempo() {
   const el = $('tempoLabel');
@@ -1340,6 +1403,7 @@ function enterNode(col, node) {
   G.col = col; G.node = node; G.selHand = -1; G.selCell = null;
   if (node === 'shop') return showShop();
   if (node === 'rest') return showRest();
+  if (node === 'event') return showEvent();
   hideModal(); Object.assign(G, freshStage());
   G.plan = makePlan(col, node); G.phase = 'build'; renderAll();
   saveRun();
@@ -1375,13 +1439,75 @@ function showRest() {
   $('offers').onclick = e => {
     const b = e.target.closest('button.offer'); if (!b || b.disabled) return;
     if (b.dataset.a === 'heal') { G.life = Math.min(G.maxLife, G.life + (G.rank >= 2 ? 2 : 4)); sfx('pick'); renderStatus(); chooseNext(); return; }
-    showModal(`<h2>${t('rest.pickTitle')}</h2><p>${t('rest.pickBody')}</p>
-      <div class="hand" id="upList">${all.map((t, i) => `<button class="chip" data-u="${i}" title="${lvNote(t.id)}">${tileHTML(t.id)}<span>${tName(t)}</span></button>`).join('')}</div>`);
-    $('upList').onclick = ev => {
-      const c = ev.target.closest('[data-u]'); if (!c) return;
-      all[+c.dataset.u].lv = 2; sfx('pick'); unlock('upgrade'); renderAll(); chooseNext();
-    };
+    upgradePicker(chooseNext);
   };
+}
+const allTiles = () => [...G.hand, ...G.board.flat().filter(Boolean)];
+function upgradePicker(then) {
+  const all = allTiles().filter(x => x.lv === 1);
+  if (!all.length) return then();
+  showModal(`<h2>${t('rest.pickTitle')}</h2><p>${t('rest.pickBody')}</p>
+    <div class="hand" id="upList">${all.map((x, i) => `<button class="chip" data-u="${i}" title="${lvNote(x.id)}">${tileHTML(x.id)}<span>${tName(x)}</span></button>`).join('')}</div>`);
+  $('upList').onclick = ev => {
+    const c = ev.target.closest('[data-u]'); if (!c) return;
+    all[+c.dataset.u].lv = 2; sfx('pick'); unlock('upgrade'); renderAll(); then();
+  };
+}
+function removeTile(x) {
+  const i = G.hand.indexOf(x); if (i >= 0) { G.hand.splice(i, 1); return; }
+  for (const row of G.board) { const j = row.indexOf(x); if (j >= 0) { row[j] = null; return; } }
+}
+// Event spaces: one offer with a cost, or walk away.
+function showEvent() {
+  G.phase = 'reward'; renderAll();
+  const rnd = () => REWARD_POOL[Math.floor(Math.random() * REWARD_POOL.length)];
+  const EV = {
+    busker: { ok: () => G.life > 2, run: () => { G.life -= 2; G.coins += 12; G.stats.coins += 12; } },
+    trade:  { ok: () => allTiles().length > 1, run: () => { const a = allTiles(); removeTile(a[Math.floor(Math.random() * a.length)]); G.hand.push(mk(rnd()), mk(rnd())); } },
+    tuner:  { ok: () => G.coins >= 5 && allTiles().some(x => x.lv === 1), run: () => { G.coins -= 5; return 'upgrade'; } },
+    pedal:  { ok: () => G.life > 3 && Object.keys(RELICS).some(k => !G.relics[k]), run: () => { G.life -= 3; return 'relic'; } },
+  };
+  const id = pick(Object.keys(EV), 1)[0], ev = EV[id];
+  showModal(`<h2>${t('ev.' + id + '.title')}</h2><p>${t('ev.' + id + '.body')}</p>
+    <div class="offers two" id="offers">
+      <button class="offer" data-e="go" ${ev.ok() ? '' : 'disabled'}><span class="offer-name">${t('ev.' + id + '.go')}</span><span class="offer-desc">${t('ev.' + id + '.goDesc')}</span></button>
+      <button class="offer" data-e="leave"><span class="offer-name">${t('ev.leave')}</span><span class="offer-desc">${t('ev.leaveDesc')}</span></button>
+    </div>`);
+  $('offers').onclick = e => {
+    const b = e.target.closest('[data-e]'); if (!b || b.disabled) return;
+    if (b.dataset.e === 'leave') return chooseNext();
+    const r = ev.run(); sfx('pick'); renderAll();
+    if (r === 'upgrade') return upgradePicker(chooseNext);
+    if (r === 'relic') return relicPick(chooseNext);
+    chooseNext();
+  };
+}
+// ================= album =================
+// Every finished run keeps its final board as a song that can be replayed from the title screen.
+function saveAlbum(result) {
+  if (!G.board.flat().some(Boolean)) return;
+  const list = store.get('album', []);
+  list.unshift({ d: Date.now(), kit: G.kit, rank: G.rank, result, col: G.col, board: JSON.parse(JSON.stringify(G.board)), root: G.root, scale: G.scale, bgm: currentBgm() });
+  store.set('album', list.slice(0, 24));
+}
+function showAlbum(back) {
+  const list = store.get('album', []);
+  const fmt = d => new Date(d).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : LANG, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  showModal(`<h2>${t('al.title')}</h2><p>${list.length ? t('al.note') : t('al.empty')}</p>
+    <div class="ach-list">${list.map((e, i) => `<div class="row album-row">
+      <span><b>${fmt(e.d)}</b>　${KITS[e.kit].name}・${e.result === 'win' ? t('al.win') : t('al.lose', { c: e.col + 1, n: ROUTE_LEN })}<br>
+      <small class="hint">${NOTE_NAMES[e.root]} ${SCALES[e.scale].name}・BGM ${t('bgm.' + e.bgm + '.name')}</small></span>
+      <button class="btn ghost small" data-al="${i}">${t('al.play')}</button></div>`).join('')}</div>
+    <div class="row"><span></span><button class="btn" id="alBack">${t('a.back')}</button></div>`);
+  $('modal').querySelectorAll('[data-al]').forEach(b => b.onclick = () => playAlbum(list[+b.dataset.al]));
+  $('alBack').onclick = back;
+}
+function playAlbum(e) {
+  ensureAudio(); hideModal();
+  keepKey(() => { G = newGame(e.kit, 0); });
+  G.board = JSON.parse(JSON.stringify(e.board)); G.root = e.root; G.scale = e.scale; G.bgm = e.bgm; G.album = true;
+  G.phase = 'win'; G.listening = true; G.step = -1; G.acc = 0;
+  fillSelects(); renderAll();
 }
 function statsHTML() {
   const st = G.stats;
@@ -1393,18 +1519,19 @@ function statsHTML() {
     <span>${t('st.maxHit')}</span><span>${st.maxHit}</span>
     <span>${t('st.overheats')}</span><span>${t('st.times', { n: st.overheats })}</span>
     <span>${t('st.coins')}</span><span>${st.coins}</span>
+    <span>${t('st.fevers')}</span><span>${st.fevers || 0}</span>
   </div>`;
 }
 function gameOver() {
   if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
-  G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run');
+  G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose');
   showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${statsHTML()}
     <div class="row"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn" id="retry">${t('o.retry')}</button></div>`);
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
   $('retry').onclick = () => showStart();
 }
 function showWin() {
-  G.phase = 'win'; renderAll(); store.del('run');
+  G.phase = 'win'; renderAll(); store.del('run'); saveAlbum('win');
   unlock('clear'); unlock('clear_' + G.kit);
   if (!G.stats.overheats) unlock('cool');
   if (G.rank >= 3) unlock('rank3');
@@ -1435,9 +1562,10 @@ function showStart() {
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
       ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
-      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
+      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
+    $('alBtn').onclick = () => showAlbum(draw);
     $('tutBtn').onclick = () => { ensureAudio(); startTutorial(); };
     $('langStart').onchange = e => { setLang(e.target.value); draw(); };
     $('kits').onclick = e => { const b = e.target.closest('[data-kit]'); if (b) { kit = b.dataset.kit; draw(); } };
@@ -1518,6 +1646,12 @@ function tutCheck() {
 }
 function tutRender() {
   const el = $('coach');
+  if (G && G.album) {
+    el.hidden = false;
+    el.innerHTML = `<div class="row"><b>${t('al.playing')}</b><button class="btn small" id="alStop">${t('al.stop')}</button></div><div class="hint">${t('al.playingNote')}</div>`;
+    $('alStop').onclick = () => { G.listening = false; G.album = false; showStart(); };
+    applySpots(); return;
+  }
   if (!inTutorial()) { el.hidden = true; applySpots(); return; }
   const st = TUT[G.tutorial];
   el.hidden = false;
