@@ -237,6 +237,9 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .bar.fever > i { background: linear-gradient(90deg, var(--drum), var(--harm), var(--lead)); animation: blink .3s steps(2) infinite; }
 .album-row { align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .controls .keys { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foot > .btn:last-child { margin-left: auto; }
+.daily .hint { flex: 1 1 260px; }
+.daily { background: color-mix(in srgb, var(--lead) 10%, transparent); border-radius: 10px; padding: 8px 10px; }
 .cell.cursor { outline: 3px dashed var(--fg); outline-offset: -4px; }
 .cell.held .tile { transform: translateY(-4px) scale(1.12); filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
@@ -361,6 +364,14 @@ const ENEMIES = {
   queen:   { hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'crown', boss: true },
   reverser:{ hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'hourglass', boss: true },
 };
+// Seeded randomness for everything that shapes a run, so a seed (e.g. the daily challenge) always plays out the same.
+// The state lives in G, so it is saved and resumed with the run. Visual and audio flourishes still use Math.random.
+function rnd() {
+  if (!G || G.rngState == null) return Math.random();
+  let x = G.rngState = (G.rngState + 0x6D2B79F5) | 0;
+  x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61);
+  return ((x ^ x >>> 14) >>> 0) / 4294967296;
+}
 const tempoMax = () => (G && G.relics.metronome ? 5 : 3) + (G && G.kit === 'rhythm' ? 1 : 0);
 
 function wave(list, type, count, start, interval, lanes) {
@@ -372,7 +383,7 @@ const UNLOCK = [['shield'], ['mirror'], ['dash', 'stealth'], ['block'], ['split'
 function makePlan(depth, kind) {
   const list = [];
   if (kind === 'boss') {
-    const bt = ['boss', 'queen', 'reverser'][Math.floor(Math.random() * 3)];
+    const bt = ['boss', 'queen', 'reverser'][Math.floor(rnd() * 3)];
     list.push({ t: 2, type: bt, lanes: [1] });
     wave(list, 'dot', 12, 6, 3, ALL); wave(list, 'dash', 6, 15, 5, ALL); wave(list, 'shield', 4, 10, 7, ALL); wave(list, 'stealth', 4, 20, 6, ALL);
   } else {
@@ -383,15 +394,15 @@ function makePlan(depth, kind) {
     const n = Math.round((14 + depth * 3.8) * (elite ? 1.3 : 1));
     const dur = 26 + depth * 2;
     for (let i = 0; i < n; i++) {
-      const t = 2 + dur * i / n + Math.random() * .8;
+      const t = 2 + dur * i / n + rnd() * .8;
       let type = 'dot';
-      if (i % 2 === 1) type = i % 6 === 1 ? newest[Math.floor(Math.random() * newest.length)] : pool[Math.floor(Math.random() * pool.length)];
+      if (i % 2 === 1) type = i % 6 === 1 ? newest[Math.floor(rnd() * newest.length)] : pool[Math.floor(rnd() * pool.length)];
       list.push({ t, type, lanes });
     }
     if (elite) wave(list, 'block', 2 + (depth >= 4 ? 1 : 0), 8, 9, ALL);
   }
   list.sort((a, b) => a.t - b.t);
-  return list.map(o => ({ t: o.t, type: o.type, lane: o.lanes[Math.floor(Math.random() * o.lanes.length)] }));
+  return list.map(o => ({ t: o.t, type: o.type, lane: o.lanes[Math.floor(rnd() * o.lanes.length)] }));
 }
 const ROUTE_LEN = 9; // 8 columns + boss
 const NODES = {
@@ -406,7 +417,7 @@ function makeColumn(c) {
   if (c === 0) return ['battle'];
   if (c === ROUTE_LEN - 1) return ['boss'];
   const extra = ['shop', 'event', ...(c >= 2 ? ['elite', 'rest'] : [])];
-  const k = Math.random() < .5 ? 2 : 1;
+  const k = rnd() < .5 ? 2 : 1;
   return ['battle', ...pick(extra, k)];
 }
 const nodeLabel = () => NODES[G.node].name;
@@ -419,6 +430,14 @@ const RELICS = {
   metronome:{},
   reverb:   {},
   limiter:  {},
+  compressor: {},
+  delay:    {},
+  chorus:   {},
+  looper:   {},
+  sidechain:{},
+  octaver:  {},
+  phaser:   {},
+  tape:     {},
 };
 const PRICES = { kick: 3, snare: 3, hat: 2, bass: 3, cymbal: 4, chord: 5, lead: 5, echo: 5, cresc: 5, ghost: 5, rest: 4, dist: 6, feedback: 6, tom: 4, maracas: 3, arp: 5, pad: 5, sync: 4 };
 const RELIC_PRICE = 9;
@@ -429,17 +448,17 @@ const DEFS = {
   kick:  { cat: 'drum', shape: 'circle', reg: null, noise: 0,
            fire: c => { for (let l = 0; l < LANES; l++) c.hitFront(l, 1 + c.drumBonus); } },
   snare: { cat: 'drum', shape: 'circle', reg: null, noise: 0,
-           fire: c => c.hitFront(c.lane, 3 + c.drumBonus) },
+           fire: c => { c.hitFront(c.lane, 3 + c.drumBonus); if (c.relic.delay) c.later(2, () => c.hitFront(c.lane, 1)); } },
   hat:   { cat: 'drum', shape: 'circle', reg: null, noise: 0,
            fire: c => c.hitFront(c.lane, 1 + c.drumBonus) },
   cymbal:{ cat: 'drum', shape: 'ring', reg: null, noise: 2,
            fire: c => { for (let l = 0; l < LANES; l++) c.knock(l, .08 * c.lv); } },
   bass:  { cat: 'bass', shape: 'square', reg: 36, noise: 0,
-           fire: c => { c.slow(c.lane, (c.relic.sub ? 2.6 : 1.5) * (c.lv === 2 ? 1.5 : 1)); c.hitFront(c.lane, 1 + (c.relic.sub ? 2 : 0)); } },
+           fire: c => { c.slow(c.lane, (c.relic.sub ? 2.6 : 1.5) * (c.lv === 2 ? 1.5 : 1)); c.hitFront(c.lane, 1 + (c.relic.sub ? 2 : 0)); if (c.relic.octaver) c.hitAll(c.lane, 1); } },
   chord: { cat: 'harm', shape: 'tri', reg: 55, noise: 1,
            fire: () => {} },
   lead:  { cat: 'lead', shape: 'diamond', reg: 67, noise: 1,
-           fire: c => c.hitAll(c.lane, 2) },
+           fire: c => c.hitAll(c.lane, 2 + (c.relic.chorus ? 1 : 0)) },
   echo:  { cat: 'lead', shape: 'diamond', reg: 72, noise: 1,
            fire: c => { c.hitFront(c.lane, 2); c.later(2, () => c.hitFront(c.lane, 2)); if (c.relic.reverb) c.later(4, () => c.hitFront(c.lane, 2)); } },
   cresc: { cat: 'harm', shape: 'tri', reg: 60, noise: 1,
@@ -457,7 +476,7 @@ const DEFS = {
   maracas: { cat: 'drum', shape: 'ring', reg: null, noise: 0,
            fire: c => { c.hitFront(c.lane, 1 + c.drumBonus); c.hitFront(c.lane, 1 + c.drumBonus); } },
   arp:   { cat: 'lead', shape: 'diamond', reg: 72, noise: 1,
-           fire: c => { pick([0, 1, 2, 3], 3).forEach(l => c.hitFront(l, 2)); } },
+           fire: c => { pick([0, 1, 2, 3], 3).forEach(l => c.hitFront(l, 2 + (c.relic.chorus ? 1 : 0))); } },
   pad:   { cat: 'harm', shape: 'tri', reg: 57, noise: 1,
            fire: c => { c.hitAll(c.lane, 1); for (let k = 1; k < 4; k++) c.later(k, () => c.hitAll(c.lane, 1)); } },
   sync:  { cat: 'lead', shape: 'square', reg: 64, noise: 0,
@@ -485,7 +504,7 @@ let G;
 function newGame(kit = 'rhythm', rank = 0) {
   const maxLife = KITS[kit].life - (rank >= 4 ? 2 : 0);
   return {
-    kit, rank, maxLife,
+    kit, rank, maxLife, rngState: (Math.random() * 2 ** 31) | 0, daily: null,
     stats: { kills: 0, dmg: 0, maxHit: 0, overheats: 0, coins: 0, battles: 0, fevers: 0 },
     col: 0, node: 'battle', coins: 0, life: maxLife, relics: {},
     board: Array.from({ length: LANES }, () => Array(STEPS).fill(null)),
@@ -543,7 +562,7 @@ const langSelect = id => `<label class="check" for="${id}">${t('ui.lang')}
   <select id="${id}">${LANGS.map(l => `<option value="${l}" ${l === LANG ? 'selected' : ''}>${I18N[l]['meta.name']}</option>`).join('')}</select></label>`;
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
-const ACHS = ['fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
+const ACHS = ['daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
 const achGot = new Set(store.get('ach', []));
 const toastQ = [];
 function unlock(id) {
@@ -560,7 +579,7 @@ function nextToast() {
   setTimeout(() => { toastQ.shift(); nextToast(); }, 2600);
 }
 
-const SAVE_KEYS = ['kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan'];
+const SAVE_KEYS = ['kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan', 'rngState', 'daily'];
 function saveRun(pending, routeOpts) {
   if (G && (G.tutorial != null || G.studio)) return;
   const o = { v: 1, uid, pending: pending || null, routeOpts: routeOpts || null };
@@ -866,6 +885,7 @@ function doStep() {
   if (G.step === 0 && G.stepCount > 1) {
     G.loop++;
     if (G.phase === 'play' && G.tempo < tempoMax()) { G.tempo++; renderTempo(); }
+    if (G.phase === 'play' && G.relics.looper && !G.fever) G.groove = Math.min(99, G.groove + 10);
   }
   G.hits = [];
   // delayed effects (echo)
@@ -890,13 +910,15 @@ function doStep() {
   let mulBase = 1;
   if (G.relics.downbeat && (G.step === 0 || G.step === 4)) mulBase *= 2;
   if (G.fever > 0) mulBase *= 1.5;
+  const sideKick = G.relics.sidechain && col.some(c => c.t.id === 'kick');
   const t0 = ac ? ac.currentTime + .01 : 0;
   for (const c of col) {
     const d = DEFS[c.t.id];
     const lvMul = c.t.lv === 2 && !['cymbal', 'bass', 'chord', 'rest'].includes(c.t.id) ? 1.6 : 1;
-    const mul = mulBase * lvMul * (c.t.id === 'chord' ? 1 : chordMul);
+    const mul = mulBase * lvMul * (c.t.id === 'chord' ? 1 : chordMul) * (sideKick && c.t.id !== 'kick' ? 1.5 : 1);
     if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, c.t.id === 'bass' && c.t.lv === 2 ? mul * 1.6 : mul, d.cat, c.t.id, c.t.lv));
-    const dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : (c.t.id === 'chord' && G.kit === 'harmony') ? 0 : d.noise;
+    let dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : (c.t.id === 'chord' && G.kit === 'harmony') ? 0 : d.noise;
+    if (G.relics.compressor && dn > 0) dn /= 2;
     G.noise = Math.max(0, G.noise + (G.phase === 'play' ? dn : 0));
     if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
   }
@@ -905,7 +927,7 @@ function doStep() {
     if (G.fever > 0) { G.fever--; if (!G.fever) G.groove = 0; }
     else if (G.stepHits > 0) {
       G.groove = Math.min(100, G.groove + 5 + 3 * Math.min(3, G.stepHits));
-      if (G.groove >= 100) { G.fever = 16; G.stats.fevers = (G.stats.fevers || 0) + 1; sfx('fever'); unlock('fever');
+      if (G.groove >= 100) { G.fever = G.relics.phaser ? 32 : 16; G.stats.fevers = (G.stats.fevers || 0) + 1; sfx('fever'); unlock('fever');
         G.texts.push({ lane: 1, x: .5, txt: t('f.fever'), life: 1.6, warn: true }); }
     } else if (col.length && G.enemies.length) G.groove = Math.max(0, G.groove - 1);
   }
@@ -920,7 +942,7 @@ function doStep() {
 function bossLogic() {
   const boss = G.enemies.find(e => ENEMIES[e.type].boss && e.hp > 0);
   if (!boss) { G.dir = 1; return; }
-  const rl = () => Math.floor(Math.random() * LANES);
+  const rl = () => Math.floor(rnd() * LANES);
   if (boss.type === 'queen') {
     // Noise Queen: adds noise every bar and summons mirrors.
     if (G.step === 0 && G.loop > 0) { G.noise += 3; G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.queen'), life: 1.2, warn: true }); }
@@ -935,11 +957,11 @@ function bossLogic() {
   }
   // Tempo Thief: every 2 bars, jump lane and mute a random beat for one bar
   if (G.step === 0 && G.loop > 0 && G.loop % 2 === 0) {
-    boss.lane = Math.floor(Math.random() * LANES);
-    G.muted = Math.floor(Math.random() * STEPS); G.mutedLeft = STEPS;
+    boss.lane = Math.floor(rnd() * LANES);
+    G.muted = Math.floor(rnd() * STEPS); G.mutedLeft = STEPS;
     G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.sealFloat', { n: G.muted + 1 }), life: 1.6, warn: true });
   }
-  if (G.stepCount % 8 === 0) spawn('mini', Math.floor(Math.random() * LANES));
+  if (G.stepCount % 8 === 0) spawn('mini', Math.floor(rnd() * LANES));
 }
 function update(dt) {
   G.t += dt;
@@ -1166,7 +1188,7 @@ function renderLegend() {
 }
 function renderStatus() {
   renderTempo(); renderLegend();
-  $('stageLabel').textContent = G.studio ? t('studio.title') : `${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
+  $('stageLabel').textContent = G.studio ? t('studio.title') : `${G.daily ? t('daily.tag') + ' ' : ''}${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
   $('lifeLabel').hidden = $('coinLabel').hidden = !!G.studio;
   document.querySelector('.meters').hidden = !!G.studio;
   document.querySelector('.keys').title = t('ui.keys');
@@ -1377,14 +1399,14 @@ window.addEventListener('resize', () => { CW = 0; });
 // ================= flow =================
 function showModal(html) { $('modal').innerHTML = html; $('overlay').hidden = false; }
 function hideModal() { $('overlay').hidden = true; }
-function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(Math.random() * a.length), 1)[0]); return out; }
+function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(rnd() * a.length), 1)[0]); return out; }
 function stageClear() {
   G.phase = 'reward'; G.overheat = 0; G.muted = -1; G.mutedLeft = 0; G.noise = 0; setDrive(0);
   sfx('clear'); renderAll();
   if (inTutorial()) return tutorialDone();
   if (G.node === 'boss') return showWin();
   const elite = G.node === 'elite';
-  const coins = elite ? 9 : 5; G.coins += coins;
+  const coins = (elite ? 9 : 5) + (G.relics.tape ? 3 : 0); G.coins += coins;
   unlock('first_win'); if (elite) unlock('elite');
   const heal = Math.min(1, G.maxLife - G.life); G.life += heal;
   G.stats.coins += coins; G.stats.battles++;
@@ -1492,10 +1514,10 @@ function removeTile(x) {
 // Event spaces: one offer with a cost, or walk away.
 function showEvent() {
   G.phase = 'reward'; renderAll();
-  const rnd = () => REWARD_POOL[Math.floor(Math.random() * REWARD_POOL.length)];
+  const randTile = () => REWARD_POOL[Math.floor(rnd() * REWARD_POOL.length)];
   const EV = {
     busker: { ok: () => G.life > 2, run: () => { G.life -= 2; G.coins += 12; G.stats.coins += 12; } },
-    trade:  { ok: () => allTiles().length > 1, run: () => { const a = allTiles(); removeTile(a[Math.floor(Math.random() * a.length)]); G.hand.push(mk(rnd()), mk(rnd())); } },
+    trade:  { ok: () => allTiles().length > 1, run: () => { const a = allTiles(); removeTile(a[Math.floor(rnd() * a.length)]); G.hand.push(mk(randTile()), mk(randTile())); } },
     tuner:  { ok: () => G.coins >= 5 && allTiles().some(x => x.lv === 1), run: () => { G.coins -= 5; return 'upgrade'; } },
     pedal:  { ok: () => G.life > 3 && Object.keys(RELICS).some(k => !G.relics[k]), run: () => { G.life -= 3; return 'relic'; } },
   };
@@ -1576,14 +1598,14 @@ function statsHTML() {
 }
 function gameOver() {
   if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
-  G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose');
+  G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose'); recordDaily(false);
   showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${statsHTML()}
     <div class="row"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn" id="retry">${t('o.retry')}</button></div>`);
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
   $('retry').onclick = () => showStart();
 }
 function showWin() {
-  G.phase = 'win'; renderAll(); store.del('run'); saveAlbum('win');
+  G.phase = 'win'; renderAll(); store.del('run'); saveAlbum('win'); recordDaily(true);
   unlock('clear'); unlock('clear_' + G.kit);
   if (!G.stats.overheats) unlock('cool');
   if (G.rank >= 3) unlock('rank3');
@@ -1597,6 +1619,28 @@ function showWin() {
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.listening = true; G.step = -1; renderAll(); };
   $('again').onclick = () => showStart();
 }
+// ================= daily challenge =================
+function todayKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function seedOf(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h | 0; }
+function dailyInfo() { const key = todayKey(), seed = seedOf('loop-daily-' + key); return { key, seed, kit: Object.keys(KITS)[Math.abs(seed) % 3] }; }
+function startDaily() {
+  const d = dailyInfo();
+  ensureAudio(); hideModal();
+  keepKey(() => { G = newGame(d.kit, 1); });
+  G.daily = d.key; G.rngState = d.seed; G.plan = makePlan(0, 'battle');
+  renderAll(); saveRun();
+}
+function recordDaily(win) {
+  if (!G.daily) return;
+  const rec = store.get('dailyRec', null), score = win ? 99 : G.col;
+  if (!rec || rec.key !== G.daily || score > rec.score) store.set('dailyRec', { key: G.daily, score });
+  if (win) unlock('daily_clear');
+}
+function dailyLine() {
+  const d = dailyInfo(), rec = store.get('dailyRec', null);
+  const best = rec && rec.key === d.key ? (rec.score >= 99 ? t('daily.cleared') : t('daily.reached', { c: rec.score + 1, n: ROUTE_LEN })) : t('daily.none');
+  return t('daily.desc', { date: d.key, kit: KITS[d.kit].name, best });
+}
 function showStart() {
   let kit = G ? G.kit : 'rhythm', rank = G ? Math.min(G.rank, loadRank()) : 0;
   const draw = () => {
@@ -1604,6 +1648,7 @@ function showStart() {
     const saved = loadRun();
     showModal(`<div class="row"><h2>LOOP</h2>${langSelect('langStart')}</div>
       ${saved ? `<div class="row"><span class="hint">${t('m.saved', { kit: KITS[saved.kit].name, r: saved.rank, c: saved.col + 1, n: ROUTE_LEN })}</span><button class="btn" id="cont">${t('m.continue')}</button></div>` : ''}
+      <div class="row daily"><span class="hint">${dailyLine()}</span><button class="btn small" id="dailyBtn">${t('daily.btn')}</button></div>
       <p>${saved ? t('m.chooseOverwrite') : t('m.choose')}</p>
       <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => `
         <button class="offer" data-kit="${k}" aria-pressed="${k === kit}">
@@ -1614,11 +1659,12 @@ function showStart() {
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
       ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
-      <div class="row"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
+      <div class="row foot"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
     $('alBtn').onclick = () => showAlbum(draw);
     $('stBtn').onclick = startStudio;
+    $('dailyBtn').onclick = startDaily;
     $('tutBtn').onclick = () => { ensureAudio(); startTutorial(); };
     $('langStart').onchange = e => { setLang(e.target.value); draw(); };
     $('kits').onclick = e => { const b = e.target.closest('[data-kit]'); if (b) { kit = b.dataset.kit; draw(); } };
