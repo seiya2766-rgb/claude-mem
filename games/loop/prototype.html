@@ -250,6 +250,9 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .shape-ring { box-shadow: none; }
 .daily { background: color-mix(in srgb, var(--lead) 10%, transparent); border-radius: 10px; padding: 8px 10px; }
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
+.offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
+.modal.start { gap: 10px; padding-block: 16px; }
+@media (min-width: 640px) { #kits { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .cell.cursor { outline: 3px dashed var(--fg); outline-offset: -4px; }
 .cell.held .tile { transform: translateY(-4px) scale(1.12); filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); }
 .proto { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
@@ -497,7 +500,12 @@ const KITS = {
   rhythm:  { hand: ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'], life: 10 },
   harmony: { hand: ['chord', 'lead', 'lead', 'bass', 'bass', 'hat'], life: 10 },
   noise:   { hand: ['dist', 'feedback', 'kick', 'hat', 'rest', 'snare', 'snare'], life: 9 },
+  // Unlocked by defeating the boss (total clears across all kits).
+  percussion: { hand: ['tom', 'maracas', 'maracas', 'kick', 'hat', 'hat'], life: 9, unlock: 1 },
+  ambient:  { hand: ['pad', 'pad', 'ghost', 'bass', 'chord', 'rest'], life: 10, unlock: 2 },
+  minimal:  { hand: ['snare', 'lead', 'bass'], life: 11, unlock: 3, plus: true },
 };
+const kitLocked = k => (KITS[k].unlock || 0) > store.get('clears', 0);
 const RANK_COUNT = 6;
 const rankText = i => t('rank.' + i);
 function loadRank() { try { return Math.min(RANK_COUNT - 1, parseInt(localStorage.getItem('loop.rank') || '0', 10) || 0); } catch (e) { return 0; } }
@@ -518,7 +526,7 @@ function newGame(kit = 'rhythm', rank = 0) {
     stats: { kills: 0, dmg: 0, maxHit: 0, overheats: 0, coins: 0, battles: 0, fevers: 0 },
     col: 0, node: 'battle', coins: 0, life: maxLife, relics: {},
     board: Array.from({ length: LANES }, () => Array(STEPS).fill(null)),
-    hand: KITS[kit].hand.map(mk),
+    hand: KITS[kit].hand.map(id => { const x = mk(id); if (KITS[kit].plus) x.lv = 2; return x; }),
     phase: 'build', listening: false, speed: 1,
     selHand: -1, selCell: null,
     root: 9, scale: 'dark',
@@ -575,7 +583,7 @@ function applyCb() { document.documentElement.toggleAttribute('data-cb', !!SET.c
 applyCb();
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
-const ACHS = ['daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
+const ACHS = ['clear_percussion', 'clear_ambient', 'clear_minimal', 'daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
 const achGot = new Set(store.get('ach', []));
 const toastQ = [];
 function unlock(id) {
@@ -960,7 +968,7 @@ function damage(e, amount, color, src) {
 function makeCtx(lane, step, mul, color, src, lv = 1) {
   return {
     lane, step, lv, loop: G.loop, noise: G.noise, relic: G.relics,
-    drumBonus: G.relics.amp ? 1 : 0,
+    drumBonus: (G.relics.amp ? 1 : 0) + (G.kit === 'percussion' && (src === 'tom' || src === 'maracas') ? 1 : 0),
     hitFront: (l, d) => damage(frontmost(l, src), d * mul, color, src),
     hitBack: (l, d) => damage(backmost(l, src), d * mul, color, src),
     hitAll: (l, d) => { for (const e of G.enemies.filter(e => e.lane === l && targetable(e, src))) damage(e, d * mul, color, src); },
@@ -1019,6 +1027,7 @@ function doStep() {
   let mulBase = 1;
   if (G.relics.downbeat && (G.step === 0 || G.step === 4)) mulBase *= 2;
   if (G.fever > 0) mulBase *= 1.5;
+  if (G.kit === 'minimal' && G.board.flat().filter(Boolean).length <= 8) mulBase *= 1.5;
   const sideKick = G.relics.sidechain && col.some(c => c.t.id === 'kick');
   const t0 = ac ? ac.currentTime + .01 : 0;
   for (const c of col) {
@@ -1028,6 +1037,7 @@ function doStep() {
     if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, c.t.id === 'bass' && c.t.lv === 2 ? mul * 1.6 : mul, d.cat, c.t.id, c.t.lv));
     let dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : (c.t.id === 'chord' && G.kit === 'harmony') ? 0 : d.noise;
     if (G.kit === 'noise' && (c.t.id === 'dist' || c.t.id === 'feedback')) dn -= 1;
+    if (G.kit === 'ambient' && (c.t.id === 'pad' || c.t.id === 'ghost')) dn = 0;
     if (G.relics.compressor && dn > 0) dn /= 2;
     G.noise = Math.max(0, G.noise + (G.phase === 'play' ? dn : 0));
     if (!d.silent) { playTile(c.t, c.lane, G.step, t0); G.hits.push(c.lane); }
@@ -1325,7 +1335,7 @@ function renderStatus() {
   $('listenBtn').textContent = G.listening ? t('ui.listenStop') : t('ui.listen');
   $('speedBtn').textContent = t('ui.speed', { n: G.speed });
 }
-const STARTER = [...new Set(Object.values(KITS).flatMap(k => k.hand))];
+const STARTER = [...new Set(Object.values(KITS).filter(k => !k.unlock).flatMap(k => k.hand))];
 // Tiles you have held in any run become available in the Studio palette.
 function recordSeen() {
   if (G.studio || G.album || inTutorial()) return;
@@ -1518,7 +1528,7 @@ $('scaleSel').addEventListener('change', e => { G.scale = e.target.value; render
 window.addEventListener('resize', () => { CW = 0; });
 
 // ================= flow =================
-function showModal(html) { $('modal').innerHTML = html; $('overlay').hidden = false; }
+function showModal(html, cls = '') { $('modal').innerHTML = html; $('modal').className = 'modal ' + cls; $('overlay').hidden = false; }
 function hideModal() { $('overlay').hidden = true; }
 function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(rnd() * a.length), 1)[0]); return out; }
 function stageClear() {
@@ -1730,6 +1740,11 @@ function gameOver() {
 function showWin() {
   G.phase = 'win'; renderAll(); store.del('run'); saveAlbum('win'); recordDaily(true);
   unlock('clear'); unlock('clear_' + G.kit);
+  if (!G.daily) {
+    const before = store.get('clears', 0); store.set('clears', before + 1);
+    const opened = Object.keys(KITS).find(k => KITS[k].unlock === before + 1);
+    if (opened) { toastQ.push(t('m.kitUnlocked', { kit: KITS[opened].name })); if (toastQ.length === 1) nextToast(); }
+  }
   if (!G.stats.overheats) unlock('cool');
   if (G.rank >= 3) unlock('rank3');
   if (G.rank >= 5) unlock('rank5');
@@ -1766,7 +1781,7 @@ function dailyLine() {
   return t('daily.desc', { date: d.key, kit: KITS[d.kit].name, best });
 }
 function showStart() {
-  let kit = G ? G.kit : 'rhythm', rank = G ? Math.min(G.rank, loadRank()) : 0;
+  let kit = G && !kitLocked(G.kit) ? G.kit : 'rhythm', rank = G ? Math.min(G.rank, loadRank()) : 0;
   const draw = () => {
     const maxRank = loadRank();
     const saved = loadRun();
@@ -1774,7 +1789,9 @@ function showStart() {
       ${saved ? `<div class="row"><span class="hint">${t('m.saved', { kit: KITS[saved.kit].name, r: saved.rank, c: saved.col + 1, n: ROUTE_LEN })}</span><button class="btn" id="cont">${t('m.continue')}</button></div>` : ''}
       <div class="row daily"><span class="hint">${dailyLine()}</span><button class="btn small" id="dailyBtn">${t('daily.btn')}</button></div>
       <p>${saved ? t('m.chooseOverwrite') : t('m.choose')}</p>
-      <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => `
+      <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => kitLocked(k) ? `
+        <button class="offer locked" disabled><span class="kind">LOCKED</span><span class="offer-name">${v.name}</span>
+          <span class="offer-desc">${t('m.locked', { n: v.unlock })}</span></button>` : `
         <button class="offer" data-kit="${k}" aria-pressed="${k === kit}">
           <span class="offer-name">${v.name}</span>
           <span class="kit-tiles">${v.hand.map(id => tileHTML(id)).join('')}</span>
@@ -1783,7 +1800,7 @@ function showStart() {
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
       ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
-      <div class="row foot"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`);
+      <div class="row foot"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`, 'start');
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
     $('alBtn').onclick = () => showAlbum(draw);
@@ -2021,7 +2038,7 @@ G = newGame();
 fillSelects();
 renderAll();
 showStart();
-window.__g = { get G() { return G; }, DEFS, startStage, doStep, update, makePlan, enterNode };
+window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode };
 requestAnimationFrame(frame);
 })();
 </script>
