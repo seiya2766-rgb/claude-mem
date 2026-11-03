@@ -612,19 +612,89 @@ function ensureAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ac = new AC();
+  buildGraph();
+}
+// The mixer: tiles, effects and BGM buses -> master -> noise drive -> compressor -> speakers.
+function buildGraph() {
   master = ac.createGain(); master.gain.value = .5;
-  shaper = ac.createWaveShaper(); setDrive(0);
+  shaper = ac.createWaveShaper(); lastDrive = -1; setDrive(0);
   const comp = ac.createDynamicsCompressor();
   master.connect(shaper); shaper.connect(comp); comp.connect(ac.destination);
   musicBus = ac.createGain(); sfxBus = ac.createGain(); musicBus.connect(master); sfxBus.connect(master);
   bgmBus = ac.createGain(); bgmBus.connect(master);
+  bgmLayer = {};
   for (const k of ['drum', 'bass', 'harm', 'lead']) { bgmLayer[k] = ac.createGain(); bgmLayer[k].connect(bgmBus); }
   analyser = ac.createAnalyser(); analyser.fftSize = 128; analyser.smoothingTimeConstant = .75; comp.connect(analyser);
   applyVolumes(); duckBgm();
   noiseBuf = ac.createBuffer(1, ac.sampleRate * .6, ac.sampleRate);
   const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
-let lastDrive = -1;
+// ================= song export =================
+// Renders the current board (with its key, scale, tempo and BGM) offline into a WAV file.
+// All notes are scheduled synchronously on an OfflineAudioContext, then the live audio globals are restored
+// before rendering starts, so the running game is never touched.
+async function renderSongWav(bars = 8) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) throw new Error('no OfflineAudioContext');
+  const sd = STEP_DUR * 100 / (G.bpm || 100), rate = 44100;
+  const off = new OAC(2, Math.ceil((bars * STEPS * sd + 2.5) * rate), rate);
+  const keep = { ac, master, shaper, noiseBuf, musicBus, sfxBus, bgmBus, bgmLayer, analyser, bus, lastDrive,
+    speed: G.speed, loop: G.loop, listening: G.listening, phase: G.phase, bgmKey: G.bgmKey, bgm: G.bgm };
+  const bgmId = currentBgm();
+  try {
+    ac = off; bus = null; buildGraph();
+    G.speed = 1; G.listening = true; G.phase = 'export'; G.bgm = bgmId;
+    for (let i = 0; i < bars * STEPS; i++) {
+      const step = i % STEPS, t = .05 + i * sd;
+      G.loop = Math.floor(i / STEPS);
+      for (let l = 0; l < LANES; l++) { const tl = G.board[l][step]; if (tl && !DEFS[tl.id].silent) playTile(tl, l, step, t); }
+      bgmStep(step, i, t);
+    }
+  } finally {
+    ({ ac, master, shaper, noiseBuf, musicBus, sfxBus, bgmBus, bgmLayer, analyser, bus, lastDrive } = keep);
+    Object.assign(G, { speed: keep.speed, loop: keep.loop, listening: keep.listening, phase: keep.phase, bgmKey: keep.bgmKey, bgm: keep.bgm });
+  }
+  return encodeWav(await off.startRendering());
+}
+function encodeWav(buf) {
+  const ch = buf.numberOfChannels, n = buf.length, data = [];
+  let peak = 0;
+  for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); data.push(d); for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i])); }
+  const gain = peak > 0 ? Math.min(4, .89 / peak) : 1; // normalise to about -1 dBFS
+  const out = new DataView(new ArrayBuffer(44 + n * ch * 2));
+  const str = (o, x) => { for (let i = 0; i < x.length; i++) out.setUint8(o + i, x.charCodeAt(i)); };
+  str(0, 'RIFF'); out.setUint32(4, 36 + n * ch * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, ch, true); out.setUint32(24, buf.sampleRate, true);
+  out.setUint32(28, buf.sampleRate * ch * 2, true); out.setUint16(32, ch * 2, true); out.setUint16(34, 16, true);
+  str(36, 'data'); out.setUint32(40, n * ch * 2, true);
+  let o = 44;
+  for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { const v = Math.max(-1, Math.min(1, data[c][i] * gain)); out.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2; }
+  return out.buffer;
+}
+let exporting = false;
+async function exportSong() {
+  if (exporting || !G.board.flat().some(Boolean)) return;
+  exporting = true; toastQ.push(t('ex.working')); if (toastQ.length === 1) nextToast();
+  try {
+    const wav = await renderSongWav();
+    const d = new Date(), pad = x => String(x).padStart(2, '0');
+    const name = `LOOP-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.wav`;
+    if (window.loopSteam && window.loopSteam.saveFile) {
+      const saved = await window.loopSteam.saveFile(name, new Uint8Array(wav));
+      if (saved) toastQ.push(t('ex.done', { name: saved }));
+    } else {
+      const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toastQ.push(t('ex.done', { name }));
+    }
+  } catch (err) {
+    toastQ.push(t('ex.fail'));
+  } finally {
+    exporting = false; if (toastQ.length === 1) nextToast();
+  }
+}
+var lastDrive = -1;
 function setDrive(x) {
   if (!shaper) return;
   const q = Math.round(x * 10) / 10; if (q === lastDrive) return; lastDrive = q;
@@ -1585,9 +1655,10 @@ function studioBar(el) {
   el.innerHTML = `<div class="row"><b>${t('studio.title')}</b><button class="btn ghost small" id="stTitle">${t('set.toTitle')}</button></div>
     <div class="setting"><label for="bpm">${t('studio.bpm')}</label><input type="range" id="bpm" min="60" max="160" step="2" value="${G.bpm}"><output id="bpmOut">${G.bpm}</output></div>
     <div class="row"><span class="hint">${t('studio.unlocked', { a: have, b: total })}</span>
-      <span class="row" style="gap:6px"><button class="btn ghost small" id="stClear">${t('studio.clear')}</button><button class="btn small" id="stSave">${t('studio.save')}</button></span></div>`;
+      <span class="row" style="gap:6px"><button class="btn ghost small" id="stClear">${t('studio.clear')}</button><button class="btn ghost small" id="stExport">${t('ex.btn')}</button><button class="btn small" id="stSave">${t('studio.save')}</button></span></div>`;
   $('bpm').oninput = e => { G.bpm = +e.target.value; $('bpmOut').textContent = G.bpm; };
   $('stClear').onclick = () => { G.board = Array.from({ length: LANES }, () => Array(STEPS).fill(null)); G.selCell = null; renderAll(); };
+  $('stExport').onclick = exportSong;
   $('stSave').onclick = () => { if (saveAlbum('studio')) { toastQ.push(t('studio.saved')); if (toastQ.length === 1) nextToast(); } };
   $('stTitle').onclick = () => { G.listening = false; showStart(); };
 }
@@ -1627,7 +1698,8 @@ function gameOver() {
   if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose'); recordDaily(false);
   showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${statsHTML()}
-    <div class="row"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn" id="retry">${t('o.retry')}</button></div>`);
+    <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><button class="btn" id="retry">${t('o.retry')}</button></div>`);
+  $('exportEnd').onclick = exportSong;
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
   $('retry').onclick = () => showStart();
 }
@@ -1642,7 +1714,8 @@ function showWin() {
   if (G.rank >= best && best < RANK_COUNT - 1) { saveRank(best + 1); unlockMsg = `<p class="unlock">${t('v.unlock', { r: best + 1, rank: rankText(best + 1) })}</p>`; }
   showModal(`<h2>${t('v.title')}</h2>
     <p>${t('v.body', { kit: KITS[G.kit].name, r: G.rank })}</p>${unlockMsg}${statsHTML()}
-    <div class="row"><button class="btn ghost" id="listenEnd">${t('v.listen')}</button><button class="btn" id="again">${t('v.again')}</button></div>`);
+    <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('v.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><button class="btn" id="again">${t('v.again')}</button></div>`);
+  $('exportEnd').onclick = exportSong;
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.listening = true; G.step = -1; renderAll(); };
   $('again').onclick = () => showStart();
 }
@@ -1853,7 +1926,8 @@ function tutRender() {
   if (G && G.studio && G.phase === 'studio') { el.hidden = false; if (!el.querySelector('#bpm')) studioBar(el); applySpots(); return; }
   if (G && G.album) {
     el.hidden = false;
-    el.innerHTML = `<div class="row"><b>${t('al.playing')}</b><button class="btn small" id="alStop">${t('al.stop')}</button></div><div class="hint">${t('al.playingNote')}</div>`;
+    el.innerHTML = `<div class="row"><b>${t('al.playing')}</b><span class="row" style="gap:6px"><button class="btn ghost small" id="alExport">${t('ex.btn')}</button><button class="btn small" id="alStop">${t('al.stop')}</button></span></div><div class="hint">${t('al.playingNote')}</div>`;
+    $('alExport').onclick = exportSong;
     $('alStop').onclick = () => { G.listening = false; G.album = false; showStart(); };
     applySpots(); return;
   }

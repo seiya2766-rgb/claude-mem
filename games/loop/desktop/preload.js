@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('loopSteam', {
   info: () => ipcRenderer.invoke('steam:info'),
   unlock: id => ipcRenderer.send('steam:achievement', String(id)),
   toggleFullscreen: () => ipcRenderer.send('win:fullscreen'),
+  saveFile: (name, bytes) => ipcRenderer.invoke('file:save', String(name), bytes),
 });

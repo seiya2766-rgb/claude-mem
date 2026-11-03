@@ -1,5 +1,6 @@
 // LOOP desktop shell. Runs the game page in a window and connects it to Steam when Steam is available.
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 // 480 is Valve's public test app (Spacewar). Set LOOP_STEAM_APP_ID to the real App ID once Steamworks assigns one.
@@ -59,6 +60,19 @@ ipcMain.on('steam:achievement', (_event, id) => {
 ipcMain.on('win:fullscreen', event => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.setFullScreen(!win.isFullScreen());
+});
+
+// Song export: ask where to save, defaulting to the user's Music folder. Returns the file name, or null if cancelled.
+ipcMain.handle('file:save', async (event, name, bytes) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const safeName = path.basename(String(name || 'LOOP.wav'));
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: path.join(app.getPath('music'), safeName),
+    filters: [{ name: 'WAV', extensions: ['wav'] }],
+  });
+  if (canceled || !filePath) return null;
+  fs.writeFileSync(filePath, Buffer.from(bytes));
+  return path.basename(filePath);
 });
 
 app.whenReady().then(createWindow);

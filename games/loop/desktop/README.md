@@ -50,5 +50,4 @@ npm run dist    # dist/ に Windows・Linux・Mac 用のフォルダを作成
 - 実機（Windows・Steam Deck）での起動確認（この環境では Electron を実行していません）
 - フォントの同梱（今は Google Fonts を読み込むので、オフラインでは代わりのフォントになる）
 - アイコン画像（`build/icon.png` など）
-- 曲を音声ファイルとして書き出す機能
 - 今日のチャレンジの記録を Steam のランキングに送る
