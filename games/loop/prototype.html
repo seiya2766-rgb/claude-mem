@@ -576,6 +576,7 @@ const toastQ = [];
 function unlock(id) {
   if (achGot.has(id)) return;
   achGot.add(id); store.set('ach', [...achGot]);
+  if (window.loopSteam) window.loopSteam.unlock(id);
   if (!ACHS.includes(id)) return;
   toastQ.push(`<b>${t('a.toast')}</b>　${t('ach.' + id + '.name')}：${t('ach.' + id + '.desc')}`);
   if (toastQ.length === 1) nextToast();
@@ -1718,6 +1719,7 @@ function showMenu() {
     <div class="setting"><label for="volBgm">${t('set.bgm')}</label><input type="range" id="volBgm" min="0" max="1" step="0.05" value="${SET.bgm}"><output id="volBgmOut">${pct(SET.bgm)}</output></div>
     <div class="setting"><label for="volSfx">${t('set.sfx')}</label><input type="range" id="volSfx" min="0" max="1" step="0.05" value="${SET.sfx}"><output id="volSfxOut">${pct(SET.sfx)}</output></div>
     <label class="check" for="shakeChk"><input type="checkbox" id="shakeChk" ${SET.shake ? 'checked' : ''}>${t('set.shake')}</label>
+    ${window.loopSteam ? `<div class="row"><span></span><button class="btn ghost small" id="fsBtn">${t('set.fullscreen')}</button></div>` : ''}
     <p class="hint">${t('set.autosave')}</p>
     <div class="row"><button class="btn ghost small" id="toTitle">${t('set.toTitle')}</button><button class="btn" id="closeMenu">${t('set.close')}</button></div>`);
   const save = () => { store.set('settings', SET); applyVolumes(); };
@@ -1727,6 +1729,7 @@ function showMenu() {
   $('shakeChk').onchange = e => { SET.shake = e.target.checked; save(); };
   $('toTitle').onclick = () => { menuOpen = false; showStart(); };
   $('closeMenu').onclick = closeMenu;
+  if ($('fsBtn')) $('fsBtn').onclick = () => window.loopSteam.toggleFullscreen();
   $('langMenu').onchange = e => { setLang(e.target.value); showMenu(); };
 }
 function closeMenu() { menuOpen = false; hideModal(); renderStatus(); }
@@ -1906,6 +1909,14 @@ textGetters(NODES, 'node', ['name', 'desc']);
 textGetters(KITS, 'kit', ['name', 'desc']);
 textGetters(SCALES, 'scale', ['name']);
 applyStatic();
+// Desktop build: take the language from Steam on first launch and re-send achievements earned earlier.
+if (window.loopSteam) {
+  window.loopSteam.info().then(info => {
+    if (!info || !info.available) return;
+    if (!SET.lang && info.language) { setLang({ japanese: 'ja', schinese: 'zh' }[info.language] || 'en'); if (G.phase === 'menu') showStart(); }
+    for (const id of achGot) window.loopSteam.unlock(id);
+  }).catch(() => {});
+}
 G = newGame();
 fillSelects();
 renderAll();

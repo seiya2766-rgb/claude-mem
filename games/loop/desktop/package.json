@@ -1,0 +1,29 @@
+{
+  "name": "loop-game",
+  "productName": "LOOP",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LOOP desktop build (Electron) for Steam",
+  "main": "main.js",
+  "scripts": {
+    "build:web": "node build-web.js",
+    "start": "npm run build:web && electron .",
+    "dist": "npm run build:web && electron-builder --win --linux --mac"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "optionalDependencies": {
+    "steamworks.js": "0.4.0"
+  },
+  "build": {
+    "appId": "com.loopgame.loop",
+    "productName": "LOOP",
+    "files": ["main.js", "preload.js", "app/**"],
+    "directories": { "output": "dist" },
+    "win": { "target": "dir" },
+    "linux": { "target": "dir" },
+    "mac": { "target": "dir" }
+  }
+}
