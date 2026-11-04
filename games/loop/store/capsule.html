@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LOOP capsule</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #11131a; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Draws LOOP store art at any size: capsule.html?w=920&h=430&logo=1&tag=Defend%20with%20your%20song
+// Layout adapts to the aspect ratio; the sequencer grid is the game's own visual language.
+const q = new URLSearchParams(location.search);
+const W = +q.get('w') || 920, H = +q.get('h') || 430;
+const showLogo = q.get('logo') !== '0', tag = q.get('tag') || '', transparent = q.get('bg') === '0';
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+cv.width = W; cv.height = H;
+
+const C = { bg: '#11131a', cell: '#232733', fg: '#e7eaf1', muted: '#8b93a7', drum: '#5b8ef0', bass: '#33b7a2', harm: '#a682ec', lead: '#f0a240', fx: '#8b93a7', noise: '#e45773' };
+// A fixed, hand-picked pattern so every capsule shows the same "song".
+const PATTERN = [
+  ['kick', null, 'hat', null, 'kick', 'hat', null, 'hat'],
+  [null, 'snare', null, 'lead', null, 'snare', 'chord', null],
+  ['bass', null, 'chord', null, 'bass', null, 'lead', 'bass'],
+  [null, 'pad', null, 'echo', null, 'dist', null, 'pad'],
+];
+const CAT = { kick: 'drum', hat: 'drum', snare: 'drum', bass: 'bass', chord: 'harm', pad: 'harm', lead: 'lead', echo: 'lead', dist: 'fx' };
+const SHAPE = { drum: 'circle', bass: 'square', harm: 'tri', lead: 'diamond', fx: 'square' };
+
+function shape(kind, x, y, r, color) {
+  cx.fillStyle = color; cx.beginPath();
+  if (kind === 'circle') cx.arc(x, y, r, 0, Math.PI * 2);
+  else if (kind === 'square') { const s = r * .9; cx.roundRect(x - s, y - s, s * 2, s * 2, r * .18); }
+  else if (kind === 'tri') { cx.moveTo(x, y - r); cx.lineTo(x + r * .95, y + r * .8); cx.lineTo(x - r * .95, y + r * .8); cx.closePath(); }
+  else { cx.moveTo(x, y - r); cx.lineTo(x + r, y); cx.lineTo(x, y + r); cx.lineTo(x - r, y); cx.closePath(); }
+  cx.fill();
+}
+
+function draw() {
+  if (transparent) cx.clearRect(0, 0, W, H); else { cx.fillStyle = C.bg; cx.fillRect(0, 0, W, H); }
+  const wide = W / H >= 1.6, tall = H / W > 1.1;
+  // Grid placement: right side on wide art, lower part on tall art, centred otherwise.
+  let gx, gy, gw, gh;
+  if (!showLogo) { gw = W * .86; gh = gw / 2; gx = (W - gw) / 2; gy = (H - gh) / 2; }
+  else if (wide) { gw = Math.min(W * .56, H * .74 * 2); gh = gw / 2; gx = W - gw - W * .05; gy = (H - gh) / 2 + gh * .06; }
+  else if (tall) { gw = W * .86; gh = gw / 2; gx = (W - gw) / 2; gy = H * .56; }
+  else { gw = W * .8; gh = gw / 2; gx = (W - gw) / 2; gy = H * .44; }
+  const cw = gw / 8, ch = gh / 4, pad = Math.min(cw, ch) * .1;
+
+  if (!transparent) {
+    // Faint lanes and a speaker line, echoing the battlefield.
+    cx.globalAlpha = .5; cx.fillStyle = C.cell;
+    for (let l = 0; l < 4; l += 2) cx.fillRect(0, gy + l * ch, W, ch);
+    cx.globalAlpha = 1;
+    const play = 5; // playhead column
+    cx.fillStyle = 'rgba(240,162,64,.16)'; cx.fillRect(gx + play * cw - pad, gy - pad * 3, cw + pad * 2, gh + pad * 6);
+    for (let l = 0; l < 4; l++) for (let s = 0; s < 8; s++) {
+      const x = gx + s * cw + pad, y = gy + l * ch + pad, w = cw - pad * 2, h = ch - pad * 2;
+      cx.fillStyle = C.cell; cx.beginPath(); cx.roundRect(x, y, w, h, Math.min(w, h) * .16); cx.fill();
+      const id = PATTERN[l][s]; if (!id) continue;
+      const cat = CAT[id], r = Math.min(w, h) * .34;
+      if (s === play) { cx.shadowColor = C[cat]; cx.shadowBlur = r * 1.6; }
+      shape(SHAPE[cat], x + w / 2, y + h / 2, s === play ? r * 1.15 : r, C[cat]);
+      cx.shadowBlur = 0;
+    }
+    // Spectrum strip above the grid.
+    const bars = 40, bw = gw / bars;
+    for (let i = 0; i < bars; i++) {
+      const v = Math.pow(Math.sin(i * .37) * .5 + .5, 1.4) * (1 - i / bars * .7);
+      const bh = Math.max(2, v * ch * .55);
+      cx.fillStyle = [C.drum, C.bass, C.harm, C.lead][Math.floor(i / bars * 4)]; cx.globalAlpha = .45 + v * .55;
+      cx.fillRect(gx + i * bw + 1, gy - pad * 4 - bh, bw - 2, bh);
+    }
+    cx.globalAlpha = 1;
+  }
+
+  if (showLogo) {
+    let size, lx, ly, align = 'left';
+    if (wide) {
+      lx = W * .06; ly = H * .5; size = H * .34;
+      cx.font = `400 ${size}px "Dela Gothic One", sans-serif`;
+      const room = gx - lx - W * .04, w0 = cx.measureText('LOOP').width;
+      if (w0 > room) size *= room / w0;
+    }
+    else if (tall) {
+      lx = W / 2; ly = H * .28; align = 'center'; size = W * .3;
+      cx.font = `400 ${size}px "Dela Gothic One", sans-serif`;
+      const w0 = cx.measureText('LOOP').width; if (w0 > W * .78) size *= W * .78 / w0;
+    }
+    else { size = Math.min(W * .2, H * .2); lx = W / 2; ly = H * .24; align = 'center'; }
+    if (!wide && !tall && transparent) { size = Math.min(W * .3, H * .5); ly = H * .5; }
+    cx.textAlign = align; cx.textBaseline = 'middle';
+    cx.font = `400 ${size}px "Dela Gothic One", sans-serif`;
+    cx.fillStyle = C.fg; cx.fillText('LOOP', lx, ly);
+    // Eight step lights under the logo.
+    const m = cx.measureText('LOOP'), lw = m.width, sx = align === 'center' ? lx - lw / 2 : lx, sw = lw / 8;
+    for (let i = 0; i < 8; i++) { cx.fillStyle = i === 5 ? C.lead : i % 2 ? '#3a4052' : C.drum; cx.fillRect(sx + i * sw + sw * .12, ly + size * .52, sw * .76, size * .09); }
+    if (tag) {
+      cx.font = `600 ${size * .17}px "IBM Plex Mono", monospace`; cx.fillStyle = C.muted;
+      cx.fillText(tag, align === 'center' ? lx : lx, ly + size * .85);
+    }
+  }
+}
+document.fonts.load('400 40px "Dela Gothic One"').then(() => document.fonts.load('600 20px "IBM Plex Mono"')).then(draw, draw);
+</script>
+</body>
+</html>
