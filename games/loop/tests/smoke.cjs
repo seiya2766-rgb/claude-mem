@@ -61,25 +61,40 @@ async function drag(p, from, to) {
     await p.waitForTimeout(80);
     check('leaving the shop shows the route choice', (await p.$$('[data-n]')).length > 0);
 
-    for (const bt of ['boss', 'queen', 'reverser']) {
+    for (const bt of ['boss', 'queen', 'reverser', 'warden', 'brood', 'phantom']) {
       const r = await p.evaluate(bt => {
         const W = window.__g;
         document.getElementById('overlay').hidden = true;
         W.enterNode(8, 'boss');
         const G = W.G;
+        G.life = G.maxLife;
         for (let l = 0; l < 4; l++) for (let s = 0; s < 8; s++) {
-          G.board[l][s] = { id: ['snare', 'tom', 'lead', 'dist'][l], uid: 9e5 + l * 8 + s, p: null, lv: 2 };
+          G.board[l][s] = { id: ['hat', 'snare', 'tom', 'hat', 'snare', 'lead', 'rest', 'tom'][s], uid: 9e5 + l * 8 + s, p: null, lv: 2 };
         }
         G.plan = [{ t: 1, type: bt, lane: 1 }];
         W.startStage();
         const dirs = new Set();
-        let t = 0;
-        while (W.G.phase === 'play' && t < 120) { W.update(0.05); t += 0.05; dirs.add(W.G.dir); }
-        return { phase: W.G.phase, dirs: [...dirs] };
+        let t = 0, rows = false;
+        while (W.G.phase === 'play' && t < 120) { W.update(0.05); t += 0.05; dirs.add(W.G.dir); if (W.G.mutedRow >= 0) rows = true; }
+        return { phase: W.G.phase, dirs: [...dirs], rows };
       }, bt);
       check(`boss "${bt}" can be beaten (win screen shows)`, r.phase === 'win', JSON.stringify(r));
       if (bt === 'reverser') check('The Reverser flips the playhead', r.dirs.includes(-1));
+      if (bt === 'warden') check('The Warden seals a row', r.rows);
     }
+
+    // Endless: from the boss win screen, keep going; an endless boss gives rewards instead of ending the run.
+    await p.click('#endlessBtn');
+    await p.waitForTimeout(80);
+    const endlessRoute = await p.$$eval('[data-n]', e => e.map(x => x.dataset.n));
+    check('endless continues past the boss', endlessRoute.length > 0 && !endlessRoute.includes('boss'), endlessRoute.join(','));
+    const eb = await p.evaluate(() => {
+      const W = window.__g; document.getElementById('overlay').hidden = true;
+      W.enterNode(13, 'boss'); W.G.life = W.G.maxLife; W.G.plan = [{ t: 1, type: 'brood', lane: 1 }]; W.startStage();
+      let t = 0; while (W.G.phase === 'play' && t < 150) { W.update(0.05); t += 0.05; }
+      return { phase: W.G.phase, offers: document.querySelectorAll('#offers [data-id]').length };
+    });
+    check('an endless boss gives a reward and the run goes on', eb.phase === 'reward' && eb.offers > 0, JSON.stringify(eb));
     check('no page errors during a run', p.errors.length === 0, p.errors.join(' | '));
     await ctx.close();
   }

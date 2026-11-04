@@ -376,6 +376,9 @@ const ENEMIES = {
   boss:    { hp: 260, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex', boss: true },
   queen:   { hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'crown', boss: true },
   reverser:{ hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'hourglass', boss: true },
+  warden:  { hp: 250, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'eye', boss: true },
+  brood:   { hp: 210, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'cluster', boss: true },
+  phantom: { hp: 230, speed: .024, dmg: 6, armor: 0, r: 16, shape: 'mirror', boss: true },
 };
 // Seeded randomness for everything that shapes a run, so a seed (e.g. the daily challenge) always plays out the same.
 // The state lives in G, so it is saved and resumed with the run. Visual and audio flourishes still use Math.random.
@@ -396,7 +399,8 @@ const UNLOCK = [['shield'], ['mirror'], ['dash', 'stealth'], ['block'], ['split'
 function makePlan(depth, kind) {
   const list = [];
   if (kind === 'boss') {
-    const bt = ['boss', 'queen', 'reverser'][Math.floor(rnd() * 3)];
+    const BOSSES = ['boss', 'queen', 'reverser', 'warden', 'brood', 'phantom'];
+    const bt = BOSSES[Math.floor(rnd() * BOSSES.length)];
     list.push({ t: 2, type: bt, lanes: [1] });
     wave(list, 'dot', 12, 6, 3, ALL); wave(list, 'dash', 6, 15, 5, ALL); wave(list, 'shield', 4, 10, 7, ALL); wave(list, 'stealth', 4, 20, 6, ALL);
   } else {
@@ -428,6 +432,7 @@ const NODES = {
 };
 function makeColumn(c) {
   if (c === 0) return ['battle'];
+  if (G.endless && c >= ROUTE_LEN) return (c - ROUTE_LEN) % 5 === 4 ? ['boss'] : ['battle', ...pick(['shop', 'event', 'elite', 'rest'], 2)];
   if (c === ROUTE_LEN - 1) return ['boss'];
   const extra = ['shop', 'event', ...(c >= 2 ? ['elite', 'rest'] : [])];
   const k = rnd() < .5 ? 2 : 1;
@@ -506,7 +511,7 @@ const KITS = {
   minimal:  { hand: ['snare', 'lead', 'bass'], life: 11, unlock: 3, plus: true },
 };
 const kitLocked = k => (KITS[k].unlock || 0) > store.get('clears', 0);
-const RANK_COUNT = 6;
+const RANK_COUNT = 10;
 const rankText = i => t('rank.' + i);
 function loadRank() { try { return Math.min(RANK_COUNT - 1, parseInt(localStorage.getItem('loop.rank') || '0', 10) || 0); } catch (e) { return 0; } }
 function saveRank(r) { try { localStorage.setItem('loop.rank', String(r)); } catch (e) {} }
@@ -537,9 +542,11 @@ function newGame(kit = 'rhythm', rank = 0) {
 function freshStage() {
   return { t: 0, acc: 0, step: -1, stepCount: 0, loop: 0, noise: 0, overheat: 0,
            enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
-           muted: -1, mutedLeft: 0, hits: [], tempo: tempoMax(), dir: 1, groove: 0, fever: 0, stepHits: 0 };
+           muted: -1, mutedLeft: 0, mutedRow: -1, mutedRowLeft: 0, hits: [], tempo: tempoMax(), dir: 1, groove: 0, fever: 0, stepHits: 0 };
 }
-const noiseMax = () => (G.relics.gate ? 42 : 30) + (G.kit === 'noise' ? 14 : 0);
+const noiseMax = () => (G.relics.gate ? 42 : 30) + (G.kit === 'noise' ? 14 : 0) - (G.rank >= 8 ? 6 : 0);
+const price = id => PRICES[id] + (G.rank >= 6 ? 2 : 0);
+const relicPrice = () => RELIC_PRICE + (G.rank >= 6 ? 2 : 0);
 
 // ================= persistence =================
 // Browser storage for the prototype. In the Steam build these map to save files (Steam Cloud)
@@ -583,7 +590,7 @@ function applyCb() { document.documentElement.toggleAttribute('data-cb', !!SET.c
 applyCb();
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
-const ACHS = ['clear_percussion', 'clear_ambient', 'clear_minimal', 'daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
+const ACHS = ['endless15', 'rank9', 'clear_percussion', 'clear_ambient', 'clear_minimal', 'daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
 const achGot = new Set(store.get('ach', []));
 const toastQ = [];
 function unlock(id) {
@@ -601,7 +608,7 @@ function nextToast() {
   setTimeout(() => { toastQ.shift(); nextToast(); }, 2600);
 }
 
-const SAVE_KEYS = ['kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan', 'rngState', 'daily'];
+const SAVE_KEYS = ['endless', 'kit', 'rank', 'maxLife', 'stats', 'col', 'node', 'coins', 'life', 'relics', 'board', 'hand', 'root', 'scale', 'plan', 'rngState', 'daily'];
 function saveRun(pending, routeOpts) {
   if (G && (G.tutorial != null || G.studio)) return;
   const o = { v: 1, uid, pending: pending || null, routeOpts: routeOpts || null };
@@ -951,6 +958,7 @@ function damage(e, amount, color, src) {
     G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color: 'noise', life: .16, max: .16 });
     return;
   }
+  if (e.type === 'brood' && G.enemies.some(o => o !== e && o.hp > 0 && o.lane === e.lane)) amount /= 2;
   const d = Math.max(1, Math.round(amount) - e.armor);
   e.hp -= d; e.flash = .12;
   G.stepHits = (G.stepHits || 0) + 1;
@@ -979,7 +987,8 @@ function makeCtx(lane, step, mul, color, src, lv = 1) {
 }
 function spawn(type, lane, x = 1) {
   const T = ENEMIES[type];
-  const hp = Math.round(T.hp * (G.rank >= 1 ? 1.25 : 1) * (ENEMIES[type].boss && G.rank >= 5 ? 1.3 : 1));
+  const hp = Math.round(T.hp * (G.rank >= 1 ? 1.25 : 1) * (ENEMIES[type].boss && G.rank >= 5 ? 1.3 : 1)
+    * (G.rank >= 7 ? 1.15 : 1) * (ENEMIES[type].boss && G.rank >= 9 ? 1.3 : 1) * (1 + .1 * Math.max(0, G.col - (ROUTE_LEN - 1))));
   G.enemies.push({ type, lane, x, revealed: false, hp, max: hp, speed: T.speed * (G.rank >= 3 ? 1.15 : 1), dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
 }
 // Big centred announcements over the lanes (stage start, boss, fever, overheat).
@@ -989,7 +998,7 @@ function startStage() {
   Object.assign(G, freshStage());
   G.tempo = tempoMax();
   G.spawns = G.plan.map(o => ({ ...o })); G.phase = 'play'; G.listening = false; setDrive(0);
-  const boss = G.plan.find(o => ENEMIES[o.type].boss);
+  const boss = G.plan.find(o => ENEMIES[o.type] && ENEMIES[o.type].boss);
   if (boss) showBanner(t('bn.boss'), ENEMIES[boss.type].name, 'noise', 2.4);
   else if (inTutorial()) showBanner(t('tut.title'), '');
   else showBanner(nodeLabel(), `${G.col + 1} / ${ROUTE_LEN}`, G.node === 'elite' ? 'harm' : 'fg');
@@ -1012,6 +1021,7 @@ function doStep() {
 
   if (G.phase === 'play') bossLogic();
   if (G.mutedLeft > 0) { G.mutedLeft--; if (!G.mutedLeft) G.muted = -1; }
+  if (G.mutedRowLeft > 0) { G.mutedRowLeft--; if (!G.mutedRowLeft) G.mutedRow = -1; }
 
   if (G.overheat > 0) {
     G.overheat--;
@@ -1022,7 +1032,7 @@ function doStep() {
   if (G.step === G.muted) { stepUI(); return; }
 
   const col = [];
-  for (let l = 0; l < LANES; l++) if (G.board[l][G.step]) col.push({ t: G.board[l][G.step], lane: l });
+  for (let l = 0; l < LANES; l++) if (G.board[l][G.step] && l !== G.mutedRow) col.push({ t: G.board[l][G.step], lane: l });
   const chordMul = col.filter(c => c.t.id === 'chord').reduce((m, c) => m * (c.t.lv === 2 ? 3 : 2), 1);
   let mulBase = 1;
   if (G.relics.downbeat && (G.step === 0 || G.step === 4)) mulBase *= 2;
@@ -1063,6 +1073,24 @@ function bossLogic() {
   const boss = G.enemies.find(e => ENEMIES[e.type].boss && e.hp > 0);
   if (!boss) { G.dir = 1; return; }
   const rl = () => Math.floor(rnd() * LANES);
+  if (boss.type === 'warden') {
+    // Warden of Silence: every two bars seals one whole row of your board for a bar.
+    if (G.step === 0 && G.loop > 0 && G.loop % 2 === 0) { G.mutedRow = rl(); G.mutedRowLeft = STEPS; G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.sealRow', { n: G.mutedRow + 1 }), life: 1.6, warn: true }); }
+    if (G.stepCount % 16 === 0) spawn('stealth', rl());
+    return;
+  }
+  if (boss.type === 'brood') {
+    // Brood Mother: keeps spawning minis; takes half damage while her brood shares her lane.
+    if (G.stepCount % 8 === 0) { spawn('mini', boss.lane); spawn('mini', rl()); }
+    return;
+  }
+  if (boss.type === 'phantom') {
+    // Phantom: at 75/50/25% health it vanishes to the back of another lane and calls shields.
+    const frac = boss.hp / boss.max, stage = frac <= .25 ? 3 : frac <= .5 ? 2 : frac <= .75 ? 1 : 0;
+    if (stage > (boss.phase || 0)) { boss.phase = stage; boss.x = Math.min(.95, boss.x + .3); boss.lane = rl(); spawn('shield', rl()); spawn('shield', rl());
+      G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.vanish'), life: 1.4, warn: true }); }
+    return;
+  }
   if (boss.type === 'queen') {
     // Noise Queen: adds noise every bar and summons mirrors.
     if (G.step === 0 && G.loop > 0) { G.noise += 3; G.texts.push({ lane: boss.lane, x: boss.x, txt: t('f.queen'), life: 1.2, warn: true }); }
@@ -1133,9 +1161,12 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   else if (shape === 'shield') cx.arc(x + 2, y, r * .8, 0, Math.PI * 2);
   else if (shape === 'crown') { cx.moveTo(x - r, y + r * .7); cx.lineTo(x - r, y - r * .5); cx.lineTo(x - r * .5, y); cx.lineTo(x, y - r); cx.lineTo(x + r * .5, y); cx.lineTo(x + r, y - r * .5); cx.lineTo(x + r, y + r * .7); cx.closePath(); }
   else if (shape === 'hourglass') { cx.moveTo(x - r, y - r); cx.lineTo(x + r, y - r); cx.lineTo(x - r, y + r); cx.lineTo(x + r, y + r); cx.closePath(); }
+  else if (shape === 'eye') { cx.ellipse(x, y, r, r * .62, 0, 0, Math.PI * 2); }
+  else if (shape === 'cluster') { for (const [dx, dy] of [[-.45, -.3], [.45, -.3], [0, .42]]) { cx.moveTo(x + dx * r + r * .55, y + dy * r); cx.arc(x + dx * r, y + dy * r, r * .55, 0, Math.PI * 2); } }
   else if (shape === 'split') { cx.arc(x - r * .4, y, r * .62, 0, Math.PI * 2); cx.moveTo(x + r * .4 + r * .62, y); cx.arc(x + r * .4, y, r * .62, 0, Math.PI * 2); }
   else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
   cx.fill();
+  if (shape === 'eye') { cx.fillStyle = C.bg; cx.beginPath(); cx.arc(x, y, r * .28, 0, Math.PI * 2); cx.fill(); }
   if (shape === 'shield') { cx.lineWidth = 2.5; cx.beginPath(); cx.arc(x + 2, y, r + 2, Math.PI * .6, Math.PI * 1.4); cx.stroke(); }
   if (shape === 'mirror') { cx.strokeStyle = C.bg; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(x - r * .4, y - r * .2); cx.lineTo(x + r * .2, y - r * .5); cx.stroke(); }
   if (opt.slow) { cx.strokeStyle = C.bass; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r + 3, 0, Math.PI * 2); cx.stroke(); }
@@ -1279,12 +1310,12 @@ function stepUI() {
   boardEl.querySelectorAll('.cell').forEach(c => {
     const s = +c.dataset.s, l = +c.dataset.l;
     c.classList.toggle('ph', running && s === G.step);
-    c.classList.toggle('muted', s === G.muted);
+    c.classList.toggle('muted', s === G.muted || l === G.mutedRow);
     c.classList.toggle('hit', running && s === G.step && G.hits.includes(l));
     c.classList.toggle('cursor', cursor.on && cursor.l === l && cursor.s === s);
     c.classList.toggle('held', !!held && held.l === l && held.s === s);
   });
-  $('overLabel').textContent = G.overheat > 0 ? t('b.overheat', { n: G.overheat }) : G.muted >= 0 ? t('b.sealed', { n: G.muted + 1 }) : '';
+  $('overLabel').textContent = G.overheat > 0 ? t('b.overheat', { n: G.overheat }) : G.muted >= 0 ? t('b.sealed', { n: G.muted + 1 }) : G.mutedRow >= 0 ? t('b.sealedRow', { n: G.mutedRow + 1 }) : '';
   renderNoise();
   if (inTutorial()) applySpots();
 }
@@ -1319,7 +1350,7 @@ function renderLegend() {
 }
 function renderStatus() {
   renderTempo(); renderLegend();
-  $('stageLabel').textContent = G.studio ? t('studio.title') : `${G.daily ? t('daily.tag') + ' ' : ''}${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.col + 1}/${ROUTE_LEN} ${nodeLabel()}`;
+  $('stageLabel').textContent = G.studio ? t('studio.title') : `${G.daily ? t('daily.tag') + ' ' : ''}${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.endless ? '∞ ' + (G.col + 1) : (G.col + 1) + '/' + ROUTE_LEN} ${nodeLabel()}`;
   $('lifeLabel').hidden = $('coinLabel').hidden = !!G.studio;
   document.querySelector('.meters').hidden = !!G.studio;
   updateKeysHint();
@@ -1535,8 +1566,9 @@ function stageClear() {
   G.phase = 'reward'; G.overheat = 0; G.muted = -1; G.mutedLeft = 0; G.noise = 0; setDrive(0);
   sfx('clear'); renderAll();
   if (inTutorial()) return tutorialDone();
-  if (G.node === 'boss') return showWin();
-  const elite = G.node === 'elite';
+  if (G.node === 'boss' && !G.endless) return showWin();
+  if (G.endless) { const best = store.get('endlessBest', 0); if (G.col + 1 > best) store.set('endlessBest', G.col + 1); if (G.col + 1 >= 15) unlock('endless15'); }
+  const elite = G.node === 'elite' || G.node === 'boss';
   const coins = (elite ? 9 : 5) + (G.relics.tape ? 3 : 0); G.coins += coins;
   unlock('first_win'); if (elite) unlock('elite');
   const heal = Math.min(G.rank >= 2 ? 1 : 2, G.maxLife - G.life); G.life += heal;
@@ -1569,6 +1601,7 @@ function relicPick(then) {
   };
 }
 function routeHTML(next) {
+  if (G.endless && next >= ROUTE_LEN) return `<div class="route"><span>${t('r.endless', { n: next + 1 })}</span></div>`;
   return `<div class="route" aria-label="${t('r.aria')}">${Array.from({ length: ROUTE_LEN }, (_, i) =>
     `<i class="${i < next ? 'done' : i === next ? 'now' : ''} ${i === ROUTE_LEN - 1 ? 'boss' : ''}"></i>`).join('')}<span>　${next + 1}/${ROUTE_LEN}</span></div>`;
 }
@@ -1600,15 +1633,15 @@ function showShop(stock) {
   showModal(`<h2>${t('s.title')}</h2><p>${t('s.coins')} <b class="coins">◎ ${G.coins}</b></p>
     <div class="offers two" id="offers">${stock.tiles.map((o, i) => o.sold
       ? `<button class="offer" disabled><span class="offer-name">${t('s.sold')}</span></button>`
-      : offerTile(o.id, PRICES[o.id]).replace('data-id=', `data-i="${i}" data-id=`)).join('')}
+      : offerTile(o.id, price(o.id)).replace('data-id=', `data-i="${i}" data-id=`)).join('')}
       ${r ? (stock.relicSold ? `<button class="offer" disabled><span class="offer-name">${t('s.sold')}</span></button>`
-        : `<button class="offer" data-k="${r}" ${G.coins < RELIC_PRICE ? 'disabled' : ''}><span class="kind">${t('p.kind')}</span><span class="offer-name">${RELICS[r].name}</span><span class="offer-desc">${RELICS[r].desc}</span><span class="price">◎ ${RELIC_PRICE}</span></button>`) : ''}
+        : `<button class="offer" data-k="${r}" ${G.coins < relicPrice() ? 'disabled' : ''}><span class="kind">${t('p.kind')}</span><span class="offer-name">${RELICS[r].name}</span><span class="offer-desc">${RELICS[r].desc}</span><span class="price">◎ ${relicPrice()}</span></button>`) : ''}
     </div>
     <div class="row"><span></span><button class="btn" id="leave">${t('s.leave')}</button></div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('button.offer'); if (!b || b.disabled) return;
-    if (b.dataset.k) { if (G.coins < RELIC_PRICE) return; G.coins -= RELIC_PRICE; G.relics[b.dataset.k] = true; stock.relicSold = true; }
-    else { const o = stock.tiles[+b.dataset.i], p = PRICES[o.id]; if (G.coins < p) return; G.coins -= p; o.sold = true; G.hand.push(mk(o.id)); }
+    if (b.dataset.k) { if (G.coins < relicPrice()) return; G.coins -= relicPrice(); G.relics[b.dataset.k] = true; stock.relicSold = true; }
+    else { const o = stock.tiles[+b.dataset.i], p = price(o.id); if (G.coins < p) return; G.coins -= p; o.sold = true; G.hand.push(mk(o.id)); }
     sfx('pick'); renderStatus(); renderHand(); showShop(stock);
   };
   $('leave').onclick = () => chooseNext();
@@ -1731,7 +1764,7 @@ function statsHTML() {
 function gameOver() {
   if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose'); recordDaily(false);
-  showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${statsHTML()}
+  showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${G.endless ? `<p class="unlock">${t('o.endless', { n: G.col + 1, best: store.get('endlessBest', G.col + 1) })}</p>` : ''}${statsHTML()}
     <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><button class="btn" id="retry">${t('o.retry')}</button></div>`);
   $('exportEnd').onclick = exportSong;
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
@@ -1748,12 +1781,14 @@ function showWin() {
   if (!G.stats.overheats) unlock('cool');
   if (G.rank >= 3) unlock('rank3');
   if (G.rank >= 5) unlock('rank5');
+  if (G.rank >= 9) unlock('rank9');
   let unlockMsg = '';
   const best = loadRank();
   if (G.rank >= best && best < RANK_COUNT - 1) { saveRank(best + 1); unlockMsg = `<p class="unlock">${t('v.unlock', { r: best + 1, rank: rankText(best + 1) })}</p>`; }
   showModal(`<h2>${t('v.title')}</h2>
     <p>${t('v.body', { kit: KITS[G.kit].name, r: G.rank })}</p>${unlockMsg}${statsHTML()}
-    <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('v.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><button class="btn" id="again">${t('v.again')}</button></div>`);
+    <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('v.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><span class="row" style="gap:6px">${G.daily ? '' : `<button class="btn ghost" id="endlessBtn">${t('v.endless')}</button>`}<button class="btn" id="again">${t('v.again')}</button></span></div>`);
+  if ($('endlessBtn')) $('endlessBtn').onclick = () => { G.endless = true; G.listening = false; G.phase = 'reward'; G.coins += 5; renderAll(); chooseNext(); };
   $('exportEnd').onclick = exportSong;
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.listening = true; G.step = -1; renderAll(); };
   $('again').onclick = () => showStart();
