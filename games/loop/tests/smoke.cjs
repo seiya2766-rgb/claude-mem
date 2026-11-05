@@ -189,6 +189,47 @@ async function drag(p, from, to) {
     await ctx.close();
   }
 
+  // v2.0 tiles, enemies and the codex
+  {
+    const { ctx, page: p } = await open(browser);
+    await p.click('#go'); await p.waitForTimeout(100);
+    const r = await p.evaluate(() => {
+      const W = window.__g, G = W.G, out = {};
+      const empty = () => Array.from({ length: 4 }, () => Array(8).fill(null));
+      const setup = (cells, enemies) => {
+        G.board = empty(); let u = 9e6;
+        for (const [l, s, id] of cells) G.board[l][s] = { id, uid: u++, p: null, lv: 1 };
+        G.plan = []; W.startStage(); G.enemies = [];
+        for (const [type, lane, x] of enemies) { G.enemies.push({ type, lane, x, revealed: false, hp: 50, max: 50, speed: 0, dmg: 1, armor: type === 'block' ? 1 : 0, r: 8, shape: 'circle', slow: 0, flash: 0 }); }
+      };
+      const runTo = step => { G.step = step - 1; G.stepCount = 40; W.doStep(); };
+      const hpAt = l => G.enemies.filter(e => e.lane === l).map(e => 50 - e.hp);
+      setup([[0, 0, 'clap'], [1, 0, 'kick']], [['dot', 0, .5]]); runTo(0); out.clap = hpAt(0)[0];
+      setup([[0, 0, 'rim']], [['block', 0, .5]]); runTo(0); out.rim = [hpAt(0)[0], G.enemies[0].armor];
+      setup([[0, 0, 'drop']], [['dot', 0, .5], ['dot', 3, .5]]); runTo(0); out.drop = [hpAt(0)[0], hpAt(3)[0]];
+      setup([[0, 1, 'choir'], [1, 3, 'chord'], [2, 2, 'pad']], [['dot', 0, .5]]); runTo(1); out.choir = hpAt(0)[0];
+      setup([[0, 0, 'stab']], [['dot', 0, .4], ['dot', 0, .6], ['dot', 0, .8]]); runTo(0); out.stab = hpAt(0);
+      setup([[0, 0, 'scratch']], [['dot', 0, .5]]); runTo(0); out.scratch = G.enemies[0].x;
+      setup([], []); W.spawn('hopper', 1, .5); W.spawn('healer', 2, .5); W.spawn('dot', 2, .6);
+      for (const e of G.enemies) { e.speed = 0; e.hp = e.max = 50; } G.enemies[2].hp = 40; G.stepCount = 3; G.step = 2; W.doStep();
+      out.hop = G.enemies[0].lane; out.heal = G.enemies[2].hp;
+      return out;
+    });
+    check('clap doubles with another drum on the beat', r.clap === 5, r.clap);
+    check('rimshot strips armor', r.rim[1] === 0 && r.rim[0] >= 2, JSON.stringify(r.rim));
+    check('drop hits every lane on beat 1', r.drop[0] === 4 && r.drop[1] === 4, JSON.stringify(r.drop));
+    check('choir grows with harmony tiles', r.choir === 4, r.choir);
+    check('stab hits the first two enemies', JSON.stringify(r.stab) === '[3,3,0]', JSON.stringify(r.stab));
+    check('scratch pushes back', r.scratch > .55, r.scratch);
+    check('hopper changes lane, healer heals', r.hop !== 1 && r.heal === 43, JSON.stringify([r.hop, r.heal]));
+    await p.evaluate(() => window.__g.G.phase = 'menu'); await p.reload(); await p.waitForTimeout(300);
+    await p.click('#cxBtn'); await p.click('[data-cx="enemies"]');
+    const seen = await p.$$eval('.cx-list .cx.got', els => els.length);
+    check('codex opens and lists met enemies', seen >= 2, `${seen} enemies`);
+    check('no page errors with the new content', p.errors.length === 0, p.errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
   const failed = results.filter(r => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

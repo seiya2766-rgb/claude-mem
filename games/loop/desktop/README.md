@@ -27,7 +27,7 @@ npm run dist    # dist/ に Windows・Linux・Mac 用のフォルダを作成
 
 | 機能 | 仕組み | Steamworks 側で必要な作業 |
 |---|---|---|
-| 実績 | ゲーム内で実績を解除すると `steam.achievement.activate(ID)` を呼ぶ。起動時に、以前解除済みの実績もまとめて送る | 下の19個を同じ ID で登録する |
+| 実績 | ゲーム内で実績を解除すると `steam.achievement.activate(ID)` を呼ぶ。起動時に、以前解除済みの実績もまとめて送る | 下の20個を同じ ID で登録する |
 | 言語 | 初回起動時に Steam の言語設定（japanese / schinese / それ以外は英語）を使う | ストアの対応言語に日本語・英語・簡体字中国語を登録 |
 | オーバーレイ | `electronEnableSteamOverlay()` を有効化 | なし |
 | クラウドセーブ | 保存データはアプリのデータフォルダにある。Steam の「Auto-Cloud」でこのフォルダを同期する | Auto-Cloud に下のパスを登録 |
@@ -36,7 +36,7 @@ npm run dist    # dist/ に Windows・Linux・Mac 用のフォルダを作成
 `main.js` は、App ID が決まるまで Valve のテスト用 ID（480）を使います。発行されたら環境変数 `LOOP_STEAM_APP_ID` で指定するか、`main.js` の値を書き換えてください。
 
 ### 実績 ID（Steamworks に同じ名前で登録）
-`first_win`, `elite`, `upgrade`, `composer`, `big_hit`, `clear`, `clear_rhythm`, `clear_harmony`, `clear_noise`, `cool`, `rank3`, `rank5`, `fever`, `daily_clear`, `clear_percussion`, `clear_ambient`, `clear_minimal`, `rank9`, `endless15`
+`first_win`, `elite`, `upgrade`, `composer`, `big_hit`, `clear`, `clear_rhythm`, `clear_harmony`, `clear_noise`, `cool`, `rank3`, `rank5`, `fever`, `daily_clear`, `clear_percussion`, `clear_ambient`, `clear_minimal`, `rank9`, `endless15`, `codex`
 
 ### Auto-Cloud のパス
 | OS | 保存場所 |

@@ -217,6 +217,10 @@ canvas#field.hurt { animation: hurt .25s linear; }
 .ach { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
 .ach .mark { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); margin-top: 2px; }
 .ach.got .mark { background: var(--gold); border-color: var(--gold); }
+.cx { grid-template-columns: 30px minmax(0, 1fr); align-items: center; }
+.cx .tile { width: 26px; height: 26px; font-size: 11px; }
+.cx-enemy { display: inline-grid; place-items: center; width: 26px; color: var(--enemy, var(--fg)); }
+.cx-tabs { justify-content: flex-start; gap: 6px; }
 .ach:not(.got) { color: var(--muted); }
 .coach { background: var(--surface); border: 2px solid var(--lead); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .coach .row b { font-size: 12px; letter-spacing: .06em; color: var(--lead); }
@@ -240,6 +244,8 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .album-row { align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .controls .keys { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .foot > .btn:last-child { margin-left: auto; }
+.row.extras { justify-content: flex-start; gap: 6px; flex-wrap: wrap; }
+.row.extras .btn.small { padding: 4px 10px; font-size: 12px; }
 .daily .hint { flex: 1 1 260px; }
 .title { display: flex; flex-direction: column; gap: 6px; }
 .title h2 { font-size: 34px !important; letter-spacing: .08em; }
@@ -374,6 +380,8 @@ const ENEMIES = {
   stealth: { hp: 4,   speed: .1,   dmg: 1, armor: 0, r: 7,  shape: 'circle', stealth: true },
   split:   { hp: 6,   speed: .07,  dmg: 2, armor: 0, r: 9,  shape: 'split' },
   mini:    { hp: 2,   speed: .09,  dmg: 1, armor: 0, r: 5,  shape: 'circle' },
+  hopper:  { hp: 5,   speed: .08,  dmg: 1, armor: 0, r: 8,  shape: 'hop' },
+  healer:  { hp: 8,   speed: .06,  dmg: 1, armor: 0, r: 8,  shape: 'plus' },
   boss:    { hp: 260, speed: .02,  dmg: 6, armor: 0, r: 16, shape: 'hex', boss: true },
   queen:   { hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'crown', boss: true },
   reverser:{ hp: 240, speed: .022, dmg: 6, armor: 0, r: 16, shape: 'hourglass', boss: true },
@@ -396,7 +404,7 @@ function wave(list, type, count, start, interval, lanes) {
 }
 const ALL = [0, 1, 2, 3];
 // Battles are generated from depth (route column). New enemy types unlock as you go deeper.
-const UNLOCK = [['shield'], ['mirror'], ['dash', 'stealth'], ['block'], ['split']];
+const UNLOCK = [['shield'], ['mirror'], ['dash', 'stealth'], ['block'], ['split'], ['hopper'], ['healer']];
 function makePlan(depth, kind) {
   const list = [];
   if (kind === 'boss') {
@@ -458,7 +466,7 @@ const RELICS = {
   phaser:   {},
   tape:     {},
 };
-const PRICES = { kick: 3, snare: 3, hat: 2, bass: 3, cymbal: 4, chord: 5, lead: 5, echo: 5, cresc: 5, ghost: 5, rest: 4, dist: 6, feedback: 6, tom: 4, maracas: 3, arp: 5, pad: 5, sync: 4 };
+const PRICES = { kick: 3, snare: 3, hat: 2, bass: 3, cymbal: 4, chord: 5, lead: 5, echo: 5, cresc: 5, ghost: 5, rest: 4, dist: 6, feedback: 6, tom: 4, maracas: 3, arp: 5, pad: 5, sync: 4, clap: 4, rim: 3, drop: 5, choir: 5, stab: 5, scratch: 4 };
 const RELIC_PRICE = 9;
 
 // Tiles. fire(c) does the gameplay; reg/auto define the default sound only.
@@ -500,8 +508,20 @@ const DEFS = {
            fire: c => { c.hitAll(c.lane, 1); for (let k = 1; k < 4; k++) c.later(k, () => c.hitAll(c.lane, 1)); } },
   sync:  { cat: 'lead', shape: 'square', reg: 64, noise: 0,
            fire: c => c.hitFront(c.lane, c.step % 2 === 1 ? 6 : 2) },
+  clap:  { cat: 'drum', shape: 'circle', reg: null, noise: 0,
+           fire: c => c.hitFront(c.lane, (2 + c.drumBonus) * (c.colCount('drum') > 1 ? 2 : 1)) },
+  rim:   { cat: 'drum', shape: 'ring', reg: null, noise: 0,
+           fire: c => { c.strip(c.lane); c.hitFront(c.lane, 2 + c.drumBonus); } },
+  drop:  { cat: 'bass', shape: 'square', reg: 33, noise: 1,
+           fire: c => { if (c.step === 0) for (let l = 0; l < LANES; l++) c.hitFront(l, 4); else c.slow(c.lane, 1); } },
+  choir: { cat: 'harm', shape: 'tri', reg: 62, noise: 1,
+           fire: c => c.hitFront(c.lane, Math.min(8, 1 + c.boardCount('harm'))) },
+  stab:  { cat: 'lead', shape: 'diamond', reg: 74, noise: 1,
+           fire: c => c.hitFirst(c.lane, 2, 3) },
+  scratch: { cat: 'fx', shape: 'square', reg: null, noise: -1,
+           fire: c => { c.hitFront(c.lane, 1); c.knock(c.lane, .1 * c.lv); } },
 };
-const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest', 'tom', 'maracas', 'arp', 'pad', 'sync'];
+const REWARD_POOL = ['kick', 'snare', 'hat', 'cymbal', 'bass', 'chord', 'lead', 'echo', 'cresc', 'dist', 'ghost', 'feedback', 'rest', 'tom', 'maracas', 'arp', 'pad', 'sync', 'clap', 'rim', 'drop', 'choir', 'stab', 'scratch'];
 const KITS = {
   rhythm:  { hand: ['kick', 'snare', 'snare', 'hat', 'hat', 'bass'], life: 10 },
   harmony: { hand: ['chord', 'lead', 'lead', 'bass', 'bass', 'hat'], life: 10 },
@@ -522,7 +542,7 @@ function saveRank(r) { try { localStorage.setItem('loop.rank', String(r)); } cat
 let uid = 1;
 const mk = id => ({ id, uid: uid++, p: null, lv: 1 });
 const tName = t => DEFS[t.id].name + (t.lv === 2 ? '+' : '');
-function lvNote(id) { return t(['chord', 'rest', 'cymbal', 'bass'].includes(id) ? 'lv.' + id : 'lv.default'); }
+function lvNote(id) { return t(id === 'scratch' ? 'lv.cymbal' : ['chord', 'rest', 'cymbal', 'bass'].includes(id) ? 'lv.' + id : 'lv.default'); }
 const canMerge = (a, b) => a && b && a !== b && a.id === b.id && a.lv === 1 && b.lv === 1;
 let G;
 function newGame(kit = 'rhythm', rank = 0) {
@@ -591,7 +611,7 @@ function applyCb() { document.documentElement.toggleAttribute('data-cb', !!SET.c
 applyCb();
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
-const ACHS = ['endless15', 'rank9', 'clear_percussion', 'clear_ambient', 'clear_minimal', 'daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5'];
+const ACHS = ['endless15', 'rank9', 'clear_percussion', 'clear_ambient', 'clear_minimal', 'daily_clear', 'fever', 'first_win', 'elite', 'upgrade', 'composer', 'big_hit', 'clear', 'clear_rhythm', 'clear_harmony', 'clear_noise', 'cool', 'rank3', 'rank5', 'codex'];
 const achGot = new Set(store.get('ach', []));
 const toastQ = [];
 function unlock(id) {
@@ -773,7 +793,7 @@ const midiName = m => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1
 function autoDeg(id, lane, step) {
   const n = SCALES[G.scale].s.length;
   const prog = Math.round(PROG[step] * n / 5);
-  if (['lead', 'echo', 'ghost', 'feedback', 'arp', 'sync'].includes(id)) return prog + (LANES - 1 - lane);
+  if (['lead', 'echo', 'ghost', 'feedback', 'arp', 'sync', 'stab'].includes(id)) return prog + (LANES - 1 - lane);
   return prog;
 }
 const tileDeg = (t, lane, step) => t.p ?? autoDeg(t.id, lane, step);
@@ -802,6 +822,12 @@ function playTile(t, lane, step, at) {
     case 'arp': [0, 2, 4].forEach((i, k) => osc('square', mtof(degToMidi(d.reg, deg + i)), time + k * STEP_DUR / G.speed / 3, .05, .1, .003, 3000)); break;
     case 'pad': [0, 2, 4].forEach(i => osc('sine', mtof(degToMidi(d.reg, deg + i)), time, .045, STEP_DUR * 4 / G.speed, .1)); break;
     case 'sync': osc('triangle', f, time, .12, .15, .002); break;
+    case 'clap': [0, .011, .022].forEach(k => noiseHit(time + k, 'bandpass', 1300, .26, .05)); noiseHit(time + .033, 'bandpass', 1100, .18, .16); break;
+    case 'rim': osc('square', 1700, time, .07, .03, .001, 4200); noiseHit(time, 'bandpass', 3400, .14, .03); break;
+    case 'drop': { const o = osc('sine', f * 2, time, .42, .55, .004); o.frequency.exponentialRampToValueAtTime(f, time + .22); osc('sawtooth', f, time, .06, .3, .004, 300); break; }
+    case 'choir': [0, 2, 4].forEach(i => { const m = mtof(degToMidi(d.reg, deg + i)); osc('sine', m, time, .045, .6, .12); osc('triangle', m * 1.004, time, .02, .6, .12, 1800); }); break;
+    case 'stab': [0, 2, 4].forEach(i => osc('sawtooth', mtof(degToMidi(d.reg, deg + i)), time, .045, .13, .002, 3600)); break;
+    case 'scratch': noiseHit(time, 'bandpass', 2600, .22, .08); noiseHit(time + .06, 'bandpass', 900, .18, .1); break;
   }
 }
 function sfx(kind) {
@@ -941,7 +967,7 @@ document.getElementById('bgmList').addEventListener('click', e => {
 });
 
 // ================= gameplay =================
-const reveals = src => src === 'hat' || src === 'cymbal';
+const reveals = src => src === 'hat' || src === 'cymbal' || src === 'rim';
 const targetable = (e, src) => e.hp > 0 && (!ENEMIES[e.type].stealth || e.revealed || reveals(src));
 function frontmost(lane, src) { let best = null; for (const e of G.enemies) if (e.lane === lane && targetable(e, src) && (!best || e.x < best.x)) best = e; return best; }
 function backmost(lane, src) { let best = null; for (const e of G.enemies) if (e.lane === lane && targetable(e, src) && (!best || e.x > best.x)) best = e; return best; }
@@ -984,10 +1010,15 @@ function makeCtx(lane, step, mul, color, src, lv = 1) {
     slow: (l, s) => { for (const e of G.enemies) if (e.lane === l) e.slow = Math.max(e.slow, s); G.fx.push({ kind: 'lane', lane: l, color, life: .25, max: .25 }); },
     knock: (l, a) => { const e = frontmost(l, src); if (e && ENEMIES[e.type].stealth) e.revealed = true; if (e && !ENEMIES[e.type].boss) { e.x = Math.min(1, e.x + a); G.fx.push({ kind: 'beam', lane: l, x: e.x, color, life: .16, max: .16 }); } },
     later: (n, fn) => G.delayed.push({ at: G.stepCount + n, fn }),
+    hitFirst: (l, n, d) => G.enemies.filter(e => e.lane === l && targetable(e, src)).sort((a, b) => a.x - b.x).slice(0, n).forEach(e => damage(e, d * mul, color, src)),
+    strip: l => { const e = frontmost(l, src); if (e && e.armor) { e.armor = 0; G.texts.push({ lane: l, x: e.x, txt: t('f.strip'), life: .6 }); } },
+    colCount: cat => G.board.reduce((n, row, l) => n + (l !== G.mutedRow && row[step] && DEFS[row[step].id].cat === cat ? 1 : 0), 0),
+    boardCount: cat => G.board.flat().filter(x => x && DEFS[x.id].cat === cat).length,
   };
 }
 function spawn(type, lane, x = 1) {
   const T = ENEMIES[type];
+  if (!G.studio && !inTutorial()) markSeen('seenEnemies', type);
   const hp = Math.round(T.hp * (G.rank >= 1 ? 1.25 : 1) * (ENEMIES[type].boss && G.rank >= 5 ? 1.3 : 1)
     * (G.rank >= 7 ? 1.15 : 1) * (ENEMIES[type].boss && G.rank >= 9 ? 1.3 : 1) * (1 + .1 * Math.max(0, G.col - (ROUTE_LEN - 1))));
   G.enemies.push({ type, lane, x, revealed: false, hp, max: hp, speed: T.speed * (G.rank >= 3 ? 1.15 : 1), dmg: T.dmg, armor: T.armor, r: T.r, shape: T.shape, slow: 0, flash: 0 });
@@ -1020,7 +1051,7 @@ function doStep() {
   if (G.phase === 'play') due.forEach(d => d.fn());
   G.noise = Math.max(0, G.noise - .5);
 
-  if (G.phase === 'play') bossLogic();
+  if (G.phase === 'play') { bossLogic(); minionLogic(); }
   if (G.mutedLeft > 0) { G.mutedLeft--; if (!G.mutedLeft) G.muted = -1; }
   if (G.mutedRowLeft > 0) { G.mutedRowLeft--; if (!G.mutedRowLeft) G.mutedRow = -1; }
 
@@ -1043,7 +1074,7 @@ function doStep() {
   const t0 = ac ? ac.currentTime + .01 : 0;
   for (const c of col) {
     const d = DEFS[c.t.id];
-    const lvMul = c.t.lv === 2 && !['cymbal', 'bass', 'chord', 'rest'].includes(c.t.id) ? 1.6 : 1;
+    const lvMul = c.t.lv === 2 && !['cymbal', 'bass', 'chord', 'rest', 'scratch'].includes(c.t.id) ? 1.6 : 1;
     const mul = mulBase * lvMul * (c.t.id === 'chord' ? 1 : chordMul) * (sideKick && c.t.id !== 'kick' ? 1.5 : 1);
     if (G.phase === 'play') d.fire(makeCtx(c.lane, G.step, c.t.id === 'bass' && c.t.lv === 2 ? mul * 1.6 : mul, d.cat, c.t.id, c.t.lv));
     let dn = c.t.id === 'rest' && c.t.lv === 2 ? -5 : (c.t.id === 'chord' && G.kit === 'harmony') ? 0 : d.noise;
@@ -1069,6 +1100,20 @@ function doStep() {
   }
   setDrive(G.phase === 'play' ? Math.min(1, G.noise / noiseMax()) * .85 : 0);
   stepUI();
+}
+// Hoppers change lane and healers mend their lane, once per half bar.
+function minionLogic() {
+  if (G.stepCount % 8 !== 4) return;
+  for (const e of G.enemies) {
+    if (e.hp <= 0) continue;
+    if (e.type === 'hopper') {
+      e.lane = e.lane === 0 ? 1 : e.lane === LANES - 1 ? LANES - 2 : e.lane + (rnd() < .5 ? -1 : 1);
+      G.texts.push({ lane: e.lane, x: e.x, txt: t('f.hop'), life: .6, warn: true });
+    }
+    if (e.type === 'healer') for (const o of G.enemies) if (o !== e && o.hp > 0 && o.lane === e.lane && o.hp < o.max && !ENEMIES[o.type].boss) {
+      o.hp = Math.min(o.max, o.hp + 3); G.texts.push({ lane: o.lane, x: o.x, txt: '+3', life: .6, warn: true });
+    }
+  }
 }
 function bossLogic() {
   const boss = G.enemies.find(e => ENEMIES[e.type].boss && e.hp > 0);
@@ -1165,6 +1210,8 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   else if (shape === 'hourglass') { cx.moveTo(x - r, y - r); cx.lineTo(x + r, y - r); cx.lineTo(x - r, y + r); cx.lineTo(x + r, y + r); cx.closePath(); }
   else if (shape === 'eye') { cx.ellipse(x, y, r, r * .62, 0, 0, Math.PI * 2); }
   else if (shape === 'cluster') { for (const [dx, dy] of [[-.45, -.3], [.45, -.3], [0, .42]]) { cx.moveTo(x + dx * r + r * .55, y + dy * r); cx.arc(x + dx * r, y + dy * r, r * .55, 0, Math.PI * 2); } }
+  else if (shape === 'hop') { cx.moveTo(x - r, y + r * .7); cx.lineTo(x, y - r); cx.lineTo(x + r, y + r * .7); cx.lineTo(x, y + r * .15); cx.closePath(); }
+  else if (shape === 'plus') { const a = r * .38; cx.rect(x - a, y - r, a * 2, r * 2); cx.rect(x - r, y - a, r * 2, a * 2); }
   else if (shape === 'split') { cx.arc(x - r * .4, y, r * .62, 0, Math.PI * 2); cx.moveTo(x + r * .4 + r * .62, y); cx.arc(x + r * .4, y, r * .62, 0, Math.PI * 2); }
   else { for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; cx[i ? 'lineTo' : 'moveTo'](x + r * Math.cos(a), y + r * Math.sin(a)); } cx.closePath(); }
   cx.fill();
@@ -1375,6 +1422,38 @@ function recordSeen() {
   const seen = new Set(store.get('seenTiles', STARTER)); const n = seen.size;
   for (const x of allTiles()) seen.add(x.id);
   if (seen.size !== n) store.set('seenTiles', [...seen]);
+  if (seen.size >= Object.keys(DEFS).length) unlock('codex');
+  for (const k of Object.keys(G.relics)) markSeen('seenPedals', k);
+}
+// Compendium: enemies and pedals you have met, kept across runs.
+const seenCache = {};
+function markSeen(key, id) {
+  const set = seenCache[key] || (seenCache[key] = new Set(store.get(key, [])));
+  if (!set.has(id)) { set.add(id); store.set(key, [...set]); }
+}
+const seenSet = key => seenCache[key] || (seenCache[key] = new Set(store.get(key, [])));
+function codexCount() {
+  const tiles = new Set([...STARTER, ...store.get('seenTiles', [])]);
+  const have = Object.keys(DEFS).filter(id => tiles.has(id)).length + Object.keys(ENEMIES).filter(id => seenSet('seenEnemies').has(id)).length
+    + Object.keys(RELICS).filter(id => seenSet('seenPedals').has(id)).length;
+  return { have, total: Object.keys(DEFS).length + Object.keys(ENEMIES).length + Object.keys(RELICS).length };
+}
+function showCodex(back, tab = 'tiles') {
+  const tiles = new Set([...STARTER, ...store.get('seenTiles', [])]);
+  const TABS = {
+    tiles: { ids: Object.keys(DEFS), has: id => tiles.has(id), icon: id => tileHTML(id), name: id => DEFS[id].name, desc: id => DEFS[id].desc },
+    enemies: { ids: Object.keys(ENEMIES), has: id => seenSet('seenEnemies').has(id), icon: id => `<span class="cx-enemy">${ENEMIES[id].boss ? '◆' : '●'}</span>`, name: id => ENEMIES[id].name, desc: id => ENEMIES[id].desc },
+    pedals: { ids: Object.keys(RELICS), has: id => seenSet('seenPedals').has(id), icon: () => '<span class="cx-enemy">◎</span>', name: id => RELICS[id].name, desc: id => RELICS[id].desc },
+  };
+  const T = TABS[tab], got = T.ids.filter(T.has).length;
+  showModal(`<h2>${t('cx.title')}</h2>
+    <div class="row cx-tabs">${Object.keys(TABS).map(k => `<button class="btn ${k === tab ? '' : 'ghost '}small" data-cx="${k}" aria-pressed="${k === tab}">${t('cx.' + k)} ${TABS[k].ids.filter(TABS[k].has).length}/${TABS[k].ids.length}</button>`).join('')}</div>
+    <div class="ach-list cx-list">${T.ids.map(id => T.has(id)
+      ? `<div class="ach cx got">${T.icon(id)}<span><b>${T.name(id)}</b><br>${T.desc(id)}</span></div>`
+      : `<div class="ach cx"><span class="mark"></span><span class="hint">${t('cx.unknown')}</span></div>`).join('')}</div>
+    <div class="row"><span class="hint">${t('cx.count', { a: got, b: T.ids.length })}</span><button class="btn" id="cxBack">${t('a.back')}</button></div>`);
+  document.querySelectorAll('[data-cx]').forEach(b => b.onclick = () => showCodex(back, b.dataset.cx));
+  $('cxBack').onclick = back;
 }
 const paletteIds = () => { const seen = new Set([...STARTER, ...store.get('seenTiles', [])]); return Object.keys(DEFS).filter(id => seen.has(id)); };
 function renderHand() {
@@ -1846,9 +1925,11 @@ function showStart() {
         <div class="ranks" id="ranks">${Array.from({ length: RANK_COUNT }, (_, i) => `<button class="btn ghost small" data-r="${i}" aria-pressed="${i === rank}" ${i > maxRank ? 'disabled' : ''}>${i}</button>`).join('')}</div>
         <p class="hint" style="margin-top:6px">${t('m.rankLine', { r: rank, list: rank ? Array.from({ length: rank }, (_, i) => rankText(i + 1)).join(t('m.sep')) : t('m.rankNone') })}</p></div>
       ${store.get('tutorialDone', false) ? '' : `<p class="unlock">${t('tut.recommend')}</p>`}
-      <div class="row foot"><span class="row" style="gap:8px"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></span><button class="btn" id="go">${t('m.go')}</button></div>`, 'start');
+      <div class="row foot"><button class="btn ${store.get('tutorialDone', false) ? 'ghost ' : ''}small" id="tutBtn">${t('tut.btn')}</button><button class="btn" id="go">${t('m.go')}</button></div>
+      <div class="row extras"><button class="btn ghost small" id="achBtn">${t('m.ach', { a: achGot.size, b: ACHS.length })}</button><button class="btn ghost small" id="cxBtn">${t('cx.btn', codexCount())}</button><button class="btn ghost small" id="stBtn">${t('studio.btn')}</button><button class="btn ghost small" id="alBtn">${t('al.btn', { n: store.get('album', []).length })}</button></div>`, 'start');
     if (saved) $('cont').onclick = () => { ensureAudio(); resumeRun(saved); };
     $('achBtn').onclick = () => showAchievements(draw);
+    $('cxBtn').onclick = () => showCodex(draw);
     $('alBtn').onclick = () => showAlbum(draw);
     $('stBtn').onclick = startStudio;
     $('dailyBtn').onclick = startDaily;
@@ -2084,7 +2165,7 @@ G = newGame();
 fillSelects();
 renderAll();
 showStart();
-window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode };
+window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode, spawn };
 requestAnimationFrame(frame);
 })();
 </script>
