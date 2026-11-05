@@ -230,6 +230,40 @@ async function drag(p, from, to) {
     await ctx.close();
   }
 
+  // v2.1 pedals
+  {
+    const { ctx, page: p } = await open(browser);
+    await p.click('#go'); await p.waitForTimeout(100);
+    const r = await p.evaluate(() => {
+      const W = window.__g, G = W.G;
+      const trial = (relics, cells, step, noise = 0) => {
+        G.board = Array.from({ length: 4 }, () => Array(8).fill(null)); let u = 7e6;
+        for (const [l, s, id] of cells) G.board[l][s] = { id, uid: u++, p: null, lv: 1 };
+        G.relics = relics; G.plan = []; W.startStage(); G.enemies = [];
+        for (let l = 0; l < 4; l++) { W.spawn('dot', l, .5); }
+        for (const e of G.enemies) { e.hp = e.max = 50; e.speed = 0; }
+        G.noise = noise; G.step = step - 1; G.stepCount = 40; W.doStep();
+        return { dmg: G.enemies.map(e => 50 - e.hp), slow: G.enemies.map(e => e.slow > 0), groove: G.groove };
+      };
+      return {
+        eq: [trial({}, [[0, 0, 'drop']], 0).dmg[0], trial({ eq: true }, [[0, 0, 'drop']], 0).dmg[0]],
+        offbeat: [trial({ offbeat: true }, [[0, 1, 'snare']], 1).dmg[0], trial({ offbeat: true }, [[0, 0, 'snare']], 0).dmg[0]],
+        bit: [trial({ bitcrusher: true }, [[0, 0, 'dist']], 0, 0).dmg[0], trial({ bitcrusher: true }, [[0, 0, 'dist']], 0, 20).dmg[0]],
+        stereo: trial({ stereo: true }, [[0, 0, 'stab']], 0).dmg[1],
+        sustain: trial({ sustain: true }, [[2, 0, 'chord']], 0).slow[2],
+        crowd: [trial({}, [[0, 0, 'snare']], 0).groove, trial({ crowd: true }, [[0, 0, 'snare']], 0).groove],
+      };
+    });
+    check('EQ doubles bass tiles', r.eq[1] === r.eq[0] * 2, JSON.stringify(r.eq));
+    check('Offbeat boosts even beats only', r.offbeat[0] === 4 && r.offbeat[1] === 3, JSON.stringify(r.offbeat));
+    check('Bitcrusher boosts when noise is high', r.bit[1] > r.bit[0], JSON.stringify(r.bit));
+    check('Stereo hits the next lane', r.stereo === 2, r.stereo);
+    check('Sustain slows the lane', r.sustain === true);
+    check('Crowd fills groove faster', r.crowd[1] > r.crowd[0], JSON.stringify(r.crowd));
+    check('no page errors with the new pedals', p.errors.length === 0, p.errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
   const failed = results.filter(r => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
