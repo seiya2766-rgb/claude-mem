@@ -252,7 +252,11 @@ h1 { background: linear-gradient(90deg, #36d6ff, #c26dff 50%, #ff5fa2); -webkit-
 canvas#field { background: #07040f; box-shadow: inset 0 0 0 1px rgba(54, 214, 255, .12); }
 .cell { background: color-mix(in srgb, var(--cell) 85%, transparent); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03); }
 .cell.ph { box-shadow: inset 0 0 0 2px var(--playhead), 0 0 14px -2px var(--playhead); background: color-mix(in srgb, var(--playhead) 10%, var(--cell)); }
-.tile { color: #13081f; --c: var(--fx); box-shadow: 0 0 10px -1px color-mix(in srgb, var(--c) 75%, transparent), inset 0 -2px 0 rgba(0, 0, 0, .18); }
+/* Tiles are drum-machine pads: a lit gradient in the instrument family's colour with the instrument drawn on top. */
+.tile { color: #12081f; --c: var(--fx); border-radius: 26%; padding: 0; overflow: visible; position: relative;
+  background: radial-gradient(130% 130% at 28% 18%, color-mix(in srgb, var(--c) 45%, #fff) 0%, var(--c) 42%, color-mix(in srgb, var(--c) 62%, #12081f) 100%);
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--c) 80%, transparent), inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -2px 0 rgba(0, 0, 0, .22); }
+.tile svg { position: absolute; left: 15%; top: 15%; width: 70%; height: 70%; display: block; overflow: visible; }
 .cat-drum { --c: var(--drum); } .cat-bass { --c: var(--bass); } .cat-harm { --c: var(--harm); } .cat-lead { --c: var(--lead); } .cat-fx { --c: var(--fx); }
 .shape-tri { box-shadow: none; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c) 80%, transparent)); }
 .shape-ring { box-shadow: 0 0 8px -1px var(--c), inset 0 0 6px -1px var(--c); }
@@ -287,6 +291,34 @@ select { background: #1a1130; }
 .coach { border-color: var(--lead); box-shadow: 0 0 20px -6px var(--lead); }
 .ach.got .mark { box-shadow: 0 0 8px var(--gold); }
 @media (prefers-reduced-motion: reduce) { .cell.ph { box-shadow: inset 0 0 0 2px var(--playhead); } }
+/* ---- UI polish: cards, pills, icons ---- */
+.e-ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: 2px; }
+.cx-ico { width: 30px; height: 30px; }
+.legend span { display: inline-flex; align-items: center; gap: 2px; }
+.panel-title, .bgm .panel-title { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--fg); letter-spacing: .06em; }
+.panel-title::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--drum); box-shadow: 0 0 8px var(--drum); flex: none; }
+#bgmPanel .panel-title::before { background: var(--harm); box-shadow: 0 0 8px var(--harm); }
+#handZone .panel-title::before { background: var(--lead); box-shadow: 0 0 8px var(--lead); }
+.status { gap: 8px; }
+#stageLabel, .status .life, .status .coins { padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+.status .life { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--life) 45%, transparent); }
+.status .coins { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent); }
+.meter-label b { white-space: nowrap; }
+.meter-label span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--noise); box-shadow: 0 0 6px var(--noise); }
+.meter:nth-child(2) .meter-label span::before { background: var(--lead); box-shadow: 0 0 6px var(--lead); }
+.lane-num { color: var(--drum); text-shadow: 0 0 6px color-mix(in srgb, var(--drum) 60%, transparent); }
+.chip { padding: 3px 11px 3px 3px; gap: 7px; }
+.chip .tile { width: 28px; height: 28px; }
+.chip:hover { border-color: color-mix(in srgb, var(--lead) 60%, var(--line)); }
+.kit-tiles .tile { width: 24px; height: 24px; }
+.offer-head .tile, .cx .tile { width: 30px; height: 30px; }
+@media (min-width: 960px) {
+  #bgmPanel, .side > .sound, #handZone { background: color-mix(in srgb, var(--surface) 80%, transparent); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .side > .sound { margin-top: -6px; }
+  #bgmPanel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; padding-bottom: 6px; }
+  .side > .sound { border-top-left-radius: 0; border-top-right-radius: 0; border-top: 1px dashed var(--line); margin-top: -14px; }
+  .side { gap: 12px; }
+}
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -1242,7 +1274,8 @@ const BASE_X = 26, QUEUE_W = 50;
 function xPix(x) { return BASE_X + 10 + x * (CW - BASE_X - 22 - QUEUE_W); }
 // Each enemy type has its own neon colour (shape still tells them apart, also in colour-blind mode).
 const ENEMY_COLOR = { dot: '#ff5fa2', dash: '#ffb547', block: '#a98bff', shield: '#4de1ff', mirror: '#e9f0ff', stealth: '#8f86c9', split: '#ff7ad9',
-  mini: '#ff9ac4', hopper: '#d4ff4d', healer: '#3dffc8' };
+  mini: '#ff9ac4', hopper: '#d4ff4d', healer: '#3dffc8',
+  boss: '#ff4d6d', queen: '#ff6fe0', reverser: '#ffc24d', warden: '#7df9ff', brood: '#b6ff5a', phantom: '#b98cff' };
 const enemyColor = type => ENEMY_COLOR[type] || '#ff3d6e';
 function drawShape(shape, x, y, r, C, opt = {}) {
   const col = opt.color || C.enemy;
@@ -1273,6 +1306,163 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   if (shape === 'mirror') { cx.strokeStyle = C.bg; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(x - r * .4, y - r * .2); cx.lineTo(x + r * .2, y - r * .5); cx.stroke(); }
   cx.shadowBlur = 0;
   if (opt.slow) { cx.strokeStyle = C.bass; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r + 3, 0, Math.PI * 2); cx.stroke(); }
+}
+// ---- enemy characters ----
+// Every enemy is drawn as a small neon creature facing the speaker (left). Shapes stay distinct per type,
+// so they read in colour-blind mode too. g is any 2D context (the field, or an offscreen icon canvas).
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+function enemyEyes(g, pts, er, look = -1) {
+  g.save(); g.shadowBlur = 0;
+  for (const [ex, ey] of pts) {
+    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(ex, ey, er, er * 1.15, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#12081f'; g.beginPath(); g.arc(ex + look * er * .38, ey + er * .1, er * .58, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+}
+function drawEnemy(g, type, x, y, r, o = {}) {
+  const col = enemyColor(type), tm = o.t ?? performance.now() / 1000, seed = o.seed || 0, detail = r >= 7;
+  const boss = ENEMIES[type] && ENEMIES[type].boss;
+  g.save();
+  if (o.hidden) {
+    g.translate(x, y); g.globalAlpha *= .45 + .15 * Math.sin(tm * 6 + seed);
+    g.strokeStyle = col; g.lineWidth = 1.5; g.setLineDash([3, 3]);
+    g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); g.stroke(); g.restore(); return;
+  }
+  const hop = type === 'hopper' ? -Math.abs(Math.sin(tm * 3.2 + seed)) * r * .45 : 0;
+  const bob = o.still ? 0 : Math.sin(tm * (boss ? 1.8 : 4.5) + seed) * r * .07 + hop;
+  g.translate(x, y + bob);
+  const lw = Math.max(1.2, r * .14);
+  g.lineWidth = lw; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = o.flash ? '#ffffff' : col;
+  g.fillStyle = o.flash ? 'rgba(255,255,255,.9)' : hexA(col, .24);
+  g.shadowColor = col; g.shadowBlur = o.glow ?? r * .9;
+  const body = () => { g.fill(); g.stroke(); };
+  const eyeR = r * .2;
+  switch (type) {
+    case 'dash': {
+      g.save(); g.shadowBlur = 0; g.globalAlpha *= .55;
+      for (const k of [-.45, 0, .45]) { g.beginPath(); g.moveTo(r * .9, k * r); g.lineTo(r * (1.6 + Math.abs(k)), k * r); g.stroke(); }
+      g.restore();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r * .8, -r * .8); g.lineTo(r * .35, 0); g.lineTo(r * .8, r * .8); g.closePath(); body();
+      if (detail) enemyEyes(g, [[-r * .05, -r * .08]], eyeR * .9);
+      break;
+    }
+    case 'block': {
+      g.beginPath(); g.roundRect(-r, -r, r * 2, r * 2, r * .28); body();
+      g.lineWidth = lw * .6; g.beginPath(); g.roundRect(-r * .6, -r * .6, r * 1.2, r * 1.2, r * .12); g.stroke();
+      g.fillStyle = col; for (const [bx, by] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.arc(bx * r * .78, by * r * .78, r * .08, 0, Math.PI * 2); g.fill(); }
+      if (detail) { enemyEyes(g, [[-r * .3, -r * .1], [r * .22, -r * .1]], eyeR * .85);
+        g.shadowBlur = 0; g.strokeStyle = col; g.lineWidth = lw * .8; g.beginPath(); g.moveTo(-r * .55, -r * .42); g.lineTo(-r * .12, -r * .28); g.moveTo(r * .45, -r * .42); g.lineTo(r * .05, -r * .28); g.stroke(); }
+      break;
+    }
+    case 'shield': {
+      g.beginPath(); g.arc(r * .18, 0, r * .78, 0, Math.PI * 2); body();
+      const on = o.immune ? 1 : .55;
+      g.save(); g.strokeStyle = o.immune ? '#ffffff' : col; g.globalAlpha *= on; g.lineWidth = lw * 2; g.shadowBlur = r * (o.immune ? 1.6 : .8);
+      g.beginPath(); g.arc(r * .18, 0, r * 1.18, Math.PI * .68, Math.PI * 1.32); g.stroke(); g.restore();
+      if (detail) enemyEyes(g, [[-r * .12, -r * .12], [r * .36, -r * .12]], eyeR * .85);
+      break;
+    }
+    case 'mirror': {
+      g.beginPath(); g.moveTo(0, -r); g.lineTo(r * .75, 0); g.lineTo(0, r); g.lineTo(-r * .75, 0); g.closePath(); body();
+      g.lineWidth = lw * .5; g.beginPath(); g.moveTo(0, -r); g.lineTo(0, r); g.moveTo(-r * .75, 0); g.lineTo(r * .75, 0); g.stroke();
+      const sh = ((tm * .7 + seed) % 1) * 2 - 1;
+      g.save(); g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = lw * .7;
+      g.beginPath(); g.moveTo(sh * r * .5 - r * .15, -r * .35); g.lineTo(sh * r * .5 + r * .15, -r * .6); g.stroke(); g.restore();
+      if (detail) enemyEyes(g, [[-r * .05, r * .28]], eyeR * .8);
+      break;
+    }
+    case 'stealth': {
+      g.globalAlpha *= .7 + .25 * Math.sin(tm * 9 + seed);
+      const w = r * .85; g.beginPath(); g.moveTo(-w, r * .9); g.lineTo(-w, -r * .1); g.arc(0, -r * .1, w, Math.PI, 0); g.lineTo(w, r * .9);
+      for (let k = 0; k < 4; k++) { const x1 = w - (k + .5) * w / 2, x2 = w - (k + 1) * w / 2; g.lineTo(x1, r * (k % 2 ? .9 : .55)); g.lineTo(x2, r * .9); }
+      g.closePath(); body();
+      if (detail) enemyEyes(g, [[-r * .32, -r * .15], [r * .18, -r * .15]], eyeR * .8);
+      break;
+    }
+    case 'split': {
+      for (const sx of [-.42, .42]) { g.beginPath(); g.arc(sx * r, 0, r * .62, 0, Math.PI * 2); body(); }
+      g.save(); g.setLineDash([2, 2]); g.lineWidth = lw * .6; g.beginPath(); g.moveTo(0, -r * .5); g.lineTo(0, r * .5); g.stroke(); g.restore();
+      if (detail) enemyEyes(g, [[-r * .5, -r * .08], [r * .34, -r * .08]], eyeR * .8);
+      break;
+    }
+    case 'hopper': {
+      g.beginPath(); g.moveTo(-r * .85, r * .35); g.arc(0, r * .35, r * .85, Math.PI, 0); g.closePath(); body();
+      const k = Math.abs(Math.sin(tm * 3.2 + seed));
+      g.beginPath(); g.moveTo(-r * .5, r * .35); g.lineTo(-r * .8, r * (.65 + k * .3)); g.lineTo(-r * 1.05, r * (.8 + k * .5));
+      g.moveTo(r * .5, r * .35); g.lineTo(r * .85, r * (.65 + k * .3)); g.lineTo(r * 1.1, r * (.8 + k * .5)); g.stroke();
+      if (detail) enemyEyes(g, [[-r * .38, -r * .45], [r * .22, -r * .45]], eyeR);
+      break;
+    }
+    case 'healer': {
+      const ph = (tm * .9 + seed) % 1;
+      g.save(); g.globalAlpha *= (1 - ph) * .7; g.lineWidth = lw * .6; g.beginPath(); g.arc(0, 0, r * (1 + ph * .7), 0, Math.PI * 2); g.stroke(); g.restore();
+      g.beginPath(); g.arc(0, 0, r * .85, 0, Math.PI * 2); body();
+      g.fillStyle = col; const a = r * .17; g.fillRect(-a, -r * .55, a * 2, r * 1.1); g.fillRect(-r * .55, -a, r * 1.1, a * 2);
+      break;
+    }
+    case 'boss': { // Tempo Thief: a clock that steals beats
+      g.beginPath(); for (let i = 0; i < 6; i++) { const an = Math.PI / 3 * i + Math.PI / 6; g[i ? 'lineTo' : 'moveTo'](r * Math.cos(an), r * Math.sin(an)); } g.closePath(); body();
+      g.lineWidth = lw * .6; g.beginPath(); g.arc(0, 0, r * .62, 0, Math.PI * 2); g.stroke();
+      for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4; g.beginPath(); g.moveTo(Math.cos(an) * r * .5, Math.sin(an) * r * .5); g.lineTo(Math.cos(an) * r * .6, Math.sin(an) * r * .6); g.stroke(); }
+      g.lineWidth = lw; g.strokeStyle = '#ffffff'; const h1 = tm * 2.2, h2 = -tm * .5;
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(h1) * r * .5, Math.sin(h1) * r * .5); g.moveTo(0, 0); g.lineTo(Math.cos(h2) * r * .32, Math.sin(h2) * r * .32); g.stroke();
+      break;
+    }
+    case 'queen': {
+      g.beginPath(); g.arc(0, r * .2, r * .78, 0, Math.PI * 2); body();
+      g.fillStyle = col; g.beginPath(); g.moveTo(-r * .7, -r * .35); g.lineTo(-r * .8, -r * 1.05); g.lineTo(-r * .38, -r * .7); g.lineTo(0, -r * 1.2); g.lineTo(r * .38, -r * .7); g.lineTo(r * .8, -r * 1.05); g.lineTo(r * .7, -r * .35); g.closePath(); g.fill();
+      enemyEyes(g, [[-r * .3, r * .15], [r * .2, r * .15]], eyeR * .8);
+      break;
+    }
+    case 'reverser': {
+      g.rotate(Math.sin(tm * 1.3 + seed) * .35);
+      g.beginPath(); g.moveTo(-r * .75, -r); g.lineTo(r * .75, -r); g.lineTo(r * .08, 0); g.lineTo(r * .75, r); g.lineTo(-r * .75, r); g.lineTo(-r * .08, 0); g.closePath(); body();
+      const sand = (tm * .3 + seed) % 1; g.fillStyle = col;
+      g.beginPath(); g.moveTo(-r * .55 * (1 - sand), -r * .75 * (1 - sand) - r * .05 * sand); g.lineTo(r * .55 * (1 - sand), -r * .75 * (1 - sand) - r * .05 * sand); g.lineTo(0, -r * .05); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(-r * .55 * sand, r * .85); g.lineTo(r * .55 * sand, r * .85); g.lineTo(0, r * (.85 - .6 * sand)); g.closePath(); g.fill();
+      break;
+    }
+    case 'warden': {
+      g.beginPath(); g.moveTo(-r * 1.1, 0); g.quadraticCurveTo(0, -r * 1.25, r * 1.1, 0); g.quadraticCurveTo(0, r * 1.25, -r * 1.1, 0); g.closePath(); body();
+      const px = Math.sin(tm * .8 + seed) * r * .2 - r * .1;
+      g.beginPath(); g.arc(px, 0, r * .42, 0, Math.PI * 2); g.stroke();
+      g.save(); g.shadowBlur = 0; g.fillStyle = '#12081f'; g.beginPath(); g.arc(px, 0, r * .22, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(px - r * .08, -r * .08, r * .07, 0, Math.PI * 2); g.fill(); g.restore();
+      g.lineWidth = lw * .7; for (const k of [-.6, -.2, .2, .6]) { g.beginPath(); g.moveTo(k * r, -r * .55 * Math.cos(k)); g.lineTo(k * r * 1.2, -r * .95); g.stroke(); }
+      break;
+    }
+    case 'brood': {
+      for (const [bx, by, br] of [[-.45, -.32, .55], [.45, -.32, .55], [0, .42, .6]]) {
+        g.beginPath(); g.arc(bx * r, by * r, br * r, 0, Math.PI * 2); body();
+        enemyEyes(g, [[bx * r - r * .1, by * r - r * .05]], eyeR * .7); g.shadowBlur = r * .9;
+      }
+      break;
+    }
+    case 'phantom': {
+      g.globalAlpha *= .75 + .25 * Math.sin(tm * 5 + seed);
+      g.beginPath(); g.moveTo(0, -r * 1.05); g.quadraticCurveTo(r * 1.05, -r * .9, r * .85, r * .1); g.quadraticCurveTo(r * .5, r * .9, 0, r * 1.05);
+      g.quadraticCurveTo(-r * .5, r * .9, -r * .85, r * .1); g.quadraticCurveTo(-r * 1.05, -r * .9, 0, -r * 1.05); g.closePath(); body();
+      g.save(); g.shadowBlur = 0; g.fillStyle = '#12081f';
+      for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * r * .12, -r * .15); g.lineTo(sx * r * .62, -r * .38); g.lineTo(sx * r * .5, r * .02); g.closePath(); g.fill(); }
+      g.restore();
+      g.lineWidth = lw * .6; g.beginPath(); g.moveTo(-r * .3, r * .5); g.quadraticCurveTo(0, r * .35, r * .3, r * .5); g.stroke();
+      break;
+    }
+    case 'mini': g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); body(); if (detail) enemyEyes(g, [[-r * .15, -r * .1]], eyeR * 1.2); break;
+    default: // dot
+      g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); body();
+      if (detail) enemyEyes(g, [[-r * .32, -r * .12], [r * .18, -r * .12]], eyeR);
+  }
+  g.restore();
+}
+// Small pictures of enemies for the legend and the codex.
+const enemyIconCache = {};
+function enemyIcon(type) {
+  if (enemyIconCache[type]) return enemyIconCache[type];
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); drawEnemy(g, type, 32, 34, 20, { still: true, t: 0, glow: 8 });
+  return enemyIconCache[type] = c.toDataURL();
 }
 // Synthwave backdrop: grid lines rush from the far right toward the speaker, faster while the music plays.
 let gridT = 0;
@@ -1351,17 +1541,20 @@ function drawField(dt) {
     const k = perLane[o.lane]++;
     const soon = G.phase === 'build' ? o.t / 8 : (o.t - G.t) / 6;
     cx.globalAlpha = 1 - Math.max(0, Math.min(1, soon)) * .65;
-    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), ENEMIES[o.type].boss ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth, color: enemyColor(o.type) });
+    drawEnemy(cx, o.type, qx + 7 + k * 14, laneY(o.lane), ENEMIES[o.type].boss ? 8 : 6, { hidden: !!ENEMIES[o.type].stealth, still: true, glow: 4 });
   }
   cx.globalAlpha = 1;
   // enemies
   for (const e of G.enemies) {
-    const x = xPix(e.x), y = laneY(e.lane), r = e.r;
+    const x = xPix(e.x), y = laneY(e.lane), r = Math.min(CH / LANES * (ENEMIES[e.type].boss ? .34 : .4), e.r * 1.45);
     const boss = ENEMIES[e.type].boss;
-    drawShape(e.shape, x, y, r, C, { flash: e.flash > 0, slow: e.slow > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, color: enemyColor(e.type), glow: boss ? 18 + (G.pulse || 0) * 12 : 10 });
+    if (e.seed == null) e.seed = Math.random() * 10;
+    drawEnemy(cx, e.type, x, y, r, { flash: e.flash > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, seed: e.seed,
+      immune: e.type === 'shield' && G.step % 2 === 1, glow: boss ? r * (1 + (G.pulse || 0) * .8) : r * .9 });
+    if (e.slow > 0) { cx.strokeStyle = C.bass; cx.lineWidth = 1.5; cx.setLineDash([2, 3]); cx.beginPath(); cx.arc(x, y, r + 4, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); }
     if (e.max > 3 && !(ENEMIES[e.type].stealth && !e.revealed)) { // hp bar
-      cx.fillStyle = C.line; cx.fillRect(x - r, y - r - 6, r * 2, 3);
-      cx.fillStyle = enemyColor(e.type); cx.fillRect(x - r, y - r - 6, r * 2 * Math.max(0, e.hp / e.max), 3);
+      cx.fillStyle = 'rgba(255,255,255,.12)'; cx.fillRect(x - r, y - r - 7, r * 2, 3);
+      cx.fillStyle = enemyColor(e.type); cx.fillRect(x - r, y - r - 7, r * 2 * Math.max(0, e.hp / e.max), 3);
     }
   }
   // damage numbers
@@ -1421,10 +1614,37 @@ function drawViz() {
 // ================= rendering: DOM =================
 const $ = id => document.getElementById(id);
 const boardEl = $('board');
+// Instrument icons (24×24, drawn with strokes in the tile's ink colour). Each tile has its own picture,
+// so tiles stay easy to tell apart without relying on colour.
+const ICONS = {
+  kick:    '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M6 21l2-2.6M18 21l-2-2.6"/>',
+  snare:   '<ellipse cx="12" cy="9" rx="8" ry="3"/><path d="M4 9v6.5c0 1.7 3.6 3 8 3s8-1.3 8-3V9"/><path d="M8 12.5v5M12 12.5v6M16 12.5v5"/>',
+  hat:     '<path d="M4 7.5c2.5-2.4 13.5-2.4 16 0z" fill="currentColor"/><path d="M4 10.5c2.5 2.4 13.5 2.4 16 0z"/><path d="M12 11.5V21M8.5 21h7"/>',
+  cymbal:  '<path d="M2.5 9.5c3.5-4 15.5-4 19 0z" fill="currentColor"/><path d="M12 9.5V21M8 21h8M5 3.5l2 2M19 3.5l-2 2M12 2v2"/>',
+  bass:    '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="14.5" r="4.5"/><circle cx="12" cy="14.5" r="1.4" fill="currentColor"/><circle cx="12" cy="6.5" r="1.6"/>',
+  chord:   '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/><path d="M7.2 4h3.6v9H7.2zM13.2 4h3.6v9h-3.6z" fill="currentColor"/>',
+  lead:    '<path d="M2 17l5-9v9l5-9v9l5-9v9l5-9"/>',
+  echo:    '<circle cx="5" cy="12" r="2.4" fill="currentColor"/><path d="M10 7.5a6 6 0 0 1 0 9M14 5a9.5 9.5 0 0 1 0 14M18 3a12.5 12.5 0 0 1 0 18"/>',
+  cresc:   '<path d="M3 12L21 5M3 12l18 7"/>',
+  dist:    '<path d="M2 15h3.5l1.5-7h4l2 9h4l1.5-6H22"/><path d="M2 4h20M2 20h20" stroke-dasharray="2 2"/>',
+  ghost:   '<path d="M5 21V10a7 7 0 0 1 14 0v11l-2.4-2-2.3 2-2.3-2-2.3 2-2.3-2z"/><circle cx="9.5" cy="10.5" r="1.3" fill="currentColor"/><circle cx="14.5" cy="10.5" r="1.3" fill="currentColor"/>',
+  feedback:'<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3.5v4h-4"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/>',
+  rest:    '<path d="M9.5 2.5l4.5 5.2-3.6 4.3 4.6 4.6c-3-1.2-5.6.2-3.6 5"/>',
+  tom:     '<ellipse cx="12" cy="10" rx="7.5" ry="3"/><path d="M4.5 10v5.5c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9V10"/><path d="M15 2.5l-3 7.5M19 3.5l-5 6"/>',
+  maracas: '<ellipse cx="8" cy="8" rx="4" ry="5" transform="rotate(-25 8 8)"/><path d="M10.2 12.4L13 21"/><ellipse cx="16.5" cy="8" rx="3.6" ry="4.6" transform="rotate(20 16.5 8)" fill="currentColor"/><path d="M15 12.2L12.5 21"/>',
+  arp:     '<circle cx="5" cy="18" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="19" cy="6" r="2.2" fill="currentColor"/><path d="M7 16.5l3-3M14 10.5l3-3"/>',
+  pad:     '<path d="M2 14c2.5-7 5-7 7.5 0s5 7 7.5 0c1.2-3.4 2.5-5 5-5"/><path d="M2 20h20" opacity=".5"/>',
+  sync:    '<path d="M7 18V5l11-2v13"/><circle cx="5" cy="18" r="2.5" fill="currentColor"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/><path d="M7 9l11-2"/>',
+  clap:    '<path d="M7.5 21c-2.5-2.6-3-6.4-1.5-9.8l2.6-5.6c.6-1.2 2.4-.6 2.1.7l-1 4 4.6-6.6c.8-1.1 2.4-.1 1.8 1.1l-2.9 5.6 4-4.3c.9-.9 2.3.2 1.6 1.3l-3.7 5.5c1.8-.9 3.3.8 2.2 2.1L14 20.4"/><path d="M3 4.5l1.6 1.6M2 9h2M7 2v2"/>',
+  rim:     '<ellipse cx="11" cy="14" rx="8" ry="4"/><path d="M3 14v2.5c0 2.2 3.6 4 8 4s8-1.8 8-4V14"/><path d="M8 11.5L21 3.5"/>',
+  drop:    '<path d="M12 2.5v11M7 9l5 5 5-5"/><path d="M3 19h4l2-2.5 3 4 3-4 2 2.5h4"/>',
+  choir:   '<rect x="8.5" y="2.5" width="7" height="11" rx="3.5"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5M8.5 21.5h7"/>',
+  stab:    '<path d="M13.5 2L5 13.5h6.2L10 22l9-12h-6.4z" fill="currentColor"/>',
+  scratch: '<circle cx="11" cy="13" r="8.5"/><circle cx="11" cy="13" r="4"/><circle cx="11" cy="13" r="1" fill="currentColor"/><path d="M21 2.5v7l-4 5"/>',
+};
 function tileHTML(id) {
   const d = DEFS[id];
-  const inner = d.shape === 'diamond' ? `<em>${d.g}</em>` : d.g;
-  return `<span class="tile shape-${d.shape} cat-${d.cat}">${inner}</span>`;
+  return `<span class="tile cat-${d.cat}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[id] || ''}</svg></span>`;
 }
 function renderBeats() {
   $('beatNums').innerHTML = '<div></div>' + Array.from({ length: STEPS }, (_, s) => `<div class="beat-num">${s + 1}</div>`).join('');
@@ -1485,7 +1705,7 @@ function spendEdit() {
 function renderLegend() {
   const types = [...new Set(G.plan.map(o => o.type))];
   if (G.node === 'boss') types.push('mini');
-  $('legend').innerHTML = types.map(t => `<span><b>${ENEMIES[t].name}</b> ${ENEMIES[t].desc}</span>`).join('');
+  $('legend').innerHTML = types.map(t => `<span><img class="e-ico" src="${enemyIcon(t)}" alt=""><b>${ENEMIES[t].name}</b> ${ENEMIES[t].desc}</span>`).join('');
 }
 function renderStatus() {
   renderTempo(); renderLegend();
@@ -1532,7 +1752,7 @@ function showCodex(back, tab = 'tiles') {
   const tiles = new Set([...STARTER, ...store.get('seenTiles', [])]);
   const TABS = {
     tiles: { ids: Object.keys(DEFS), has: id => tiles.has(id), icon: id => tileHTML(id), name: id => DEFS[id].name, desc: id => DEFS[id].desc },
-    enemies: { ids: Object.keys(ENEMIES), has: id => seenSet('seenEnemies').has(id), icon: id => `<span class="cx-enemy">${ENEMIES[id].boss ? '◆' : '●'}</span>`, name: id => ENEMIES[id].name, desc: id => ENEMIES[id].desc },
+    enemies: { ids: Object.keys(ENEMIES), has: id => seenSet('seenEnemies').has(id), icon: id => `<img class="cx-ico" src="${enemyIcon(id)}" alt="">`, name: id => ENEMIES[id].name, desc: id => ENEMIES[id].desc },
     pedals: { ids: Object.keys(RELICS), has: id => seenSet('seenPedals').has(id), icon: () => '<span class="cx-enemy">◎</span>', name: id => RELICS[id].name, desc: id => RELICS[id].desc },
   };
   const T = TABS[tab], got = T.ids.filter(T.has).length;
