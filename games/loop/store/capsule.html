@@ -5,7 +5,7 @@
 <title>LOOP capsule</title>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; background: #11131a; }
+  html, body { margin: 0; background: #0a0614; }
   canvas { display: block; }
 </style>
 </head>
@@ -20,7 +20,7 @@ const showLogo = q.get('logo') !== '0', tag = q.get('tag') || '', transparent = 
 const cv = document.getElementById('c'), cx = cv.getContext('2d');
 cv.width = W; cv.height = H;
 
-const C = { bg: '#11131a', cell: '#232733', fg: '#e7eaf1', muted: '#8b93a7', drum: '#5b8ef0', bass: '#33b7a2', harm: '#a682ec', lead: '#f0a240', fx: '#8b93a7', noise: '#e45773' };
+const C = { bg: '#0a0614', cell: '#1d1338', fg: '#f5eeff', muted: '#9b8dc4', drum: '#36d6ff', bass: '#2cf2b4', harm: '#c26dff', lead: '#ffa44d', fx: '#9690c4', noise: '#ff3d7f' };
 // A fixed, hand-picked pattern so every capsule shows the same "song".
 const PATTERN = [
   ['kick', null, 'hat', null, 'kick', 'hat', null, 'hat'],
@@ -41,7 +41,13 @@ function shape(kind, x, y, r, color) {
 }
 
 function draw() {
-  if (transparent) cx.clearRect(0, 0, W, H); else { cx.fillStyle = C.bg; cx.fillRect(0, 0, W, H); }
+  if (transparent) cx.clearRect(0, 0, W, H); else {
+    cx.fillStyle = C.bg; cx.fillRect(0, 0, W, H);
+    const g1 = cx.createRadialGradient(W * .5, -H * .1, 0, W * .5, -H * .1, Math.max(W, H) * .8);
+    g1.addColorStop(0, 'rgba(90,30,170,.75)'); g1.addColorStop(1, 'rgba(90,30,170,0)'); cx.fillStyle = g1; cx.fillRect(0, 0, W, H);
+    const g2 = cx.createRadialGradient(W * .5, H * 1.15, 0, W * .5, H * 1.15, Math.max(W, H) * .6);
+    g2.addColorStop(0, 'rgba(255,61,154,.45)'); g2.addColorStop(1, 'rgba(255,61,154,0)'); cx.fillStyle = g2; cx.fillRect(0, 0, W, H);
+  }
   const wide = W / H >= 1.6, tall = H / W > 1.1;
   // Grid placement: right side on wide art, lower part on tall art, centred otherwise.
   let gx, gy, gw, gh;
@@ -95,7 +101,9 @@ function draw() {
     if (!wide && !tall && transparent) { size = Math.min(W * .3, H * .5); ly = H * .5; }
     cx.textAlign = align; cx.textBaseline = 'middle';
     cx.font = `400 ${size}px "Dela Gothic One", sans-serif`;
-    cx.fillStyle = C.fg; cx.fillText('LOOP', lx, ly);
+    const m0 = cx.measureText('LOOP'), x0 = align === 'center' ? lx - m0.width / 2 : lx;
+    const lg = cx.createLinearGradient(x0, 0, x0 + m0.width, 0); lg.addColorStop(0, '#36d6ff'); lg.addColorStop(.5, '#c26dff'); lg.addColorStop(1, '#ff5fa2');
+    cx.shadowColor = '#c26dff'; cx.shadowBlur = size * .25; cx.fillStyle = lg; cx.fillText('LOOP', lx, ly); cx.shadowBlur = 0;
     // Eight step lights under the logo.
     const m = cx.measureText('LOOP'), lw = m.width, sx = align === 'center' ? lx - lw / 2 : lx, sw = lw / 8;
     for (let i = 0; i < 8; i++) { cx.fillStyle = i === 5 ? C.lead : i % 2 ? '#3a4052' : C.drum; cx.fillRect(sx + i * sw + sw * .12, ly + size * .52, sw * .76, size * .09); }

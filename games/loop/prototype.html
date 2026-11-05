@@ -6,40 +6,27 @@
 <style>
 /* Layout: one narrow column — status, the lane field where enemies approach, then the 4x8 sequencer that defends those lanes, then hand + sound settings. */
 :root {
-  --bg: #e9ecf1;
-  --surface: #f8f9fb;
-  --cell: #dfe3ea;
-  --fg: #1a1e29;
-  --muted: #687085;
-  --line: #cdd2dc;
-  --life: #d6455a;
-  --noise: #c93a57;
-  --gold: #b9861c;
-  --drum: #2f69d6;
-  --bass: #138f7d;
-  --harm: #8656d2;
-  --lead: #d9831a;
-  --fx: #5d6679;
-  --enemy: #1a1e29;
-  --playhead: #2f69d6;
+  /* Neon synthwave: deep indigo night, glowing instrument colours, a pink-to-sunset accent. */
+  --bg: #0a0614;
+  --surface: #140c27;
+  --cell: #1d1338;
+  --fg: #f5eeff;
+  --muted: #9b8dc4;
+  --line: #352660;
+  --life: #ff4f8b;
+  --noise: #ff3d7f;
+  --gold: #ffd166;
+  --drum: #36d6ff;
+  --bass: #2cf2b4;
+  --harm: #c26dff;
+  --lead: #ffa44d;
+  --fx: #9690c4;
+  --enemy: #ff5fa2;
+  --playhead: #36d6ff;
+  --accent: linear-gradient(90deg, #ff3d9a, #ff7a59 55%, #ffb547);
   --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
   --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
-    --life: #ef6178; --noise: #e45773; --gold: #e0ad45;
-    --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
-    --enemy: #e7eaf1; --playhead: #5b8ef0;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #11131a; --surface: #191c25; --cell: #232733; --fg: #e7eaf1; --muted: #8b93a7; --line: #2d3240;
-  --life: #ef6178; --noise: #e45773; --gold: #e0ad45;
-  --drum: #5b8ef0; --bass: #33b7a2; --harm: #a682ec; --lead: #f0a240; --fx: #8b93a7;
-  --enemy: #e7eaf1; --playhead: #5b8ef0;
   color-scheme: dark;
 }
 :root:lang(zh-Hans) { --f-display: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
@@ -256,6 +243,50 @@ canvas#viz { width: 100%; height: 22px; display: block; }
 .tile { box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .16); }
 .shape-ring { box-shadow: none; }
 .daily { background: color-mix(in srgb, var(--lead) 10%, transparent); border-radius: 10px; padding: 8px 10px; }
+/* ---- neon layer ---- */
+body { background: radial-gradient(ellipse 90% 60% at 50% -12%, #3a1470 0%, transparent 62%), radial-gradient(ellipse 70% 40% at 50% 112%, #4a0f4f 0%, transparent 65%), var(--bg); background-attachment: fixed; }
+h1 { background: linear-gradient(90deg, #36d6ff, #c26dff 50%, #ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 10px rgba(194, 109, 255, .55)); }
+.modal h2, .title h2 { background: linear-gradient(90deg, #36d6ff, #c26dff 50%, #ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(194, 109, 255, .45)); }
+.stage, .info, .modal, .coach { background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 0 0 1px rgba(194, 109, 255, .08), 0 10px 40px rgba(10, 0, 30, .6), inset 0 1px 0 rgba(255, 255, 255, .04); }
+.stage { border-color: color-mix(in srgb, var(--harm) 30%, var(--line)); }
+canvas#field { background: #07040f; box-shadow: inset 0 0 0 1px rgba(54, 214, 255, .12); }
+.cell { background: color-mix(in srgb, var(--cell) 85%, transparent); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03); }
+.cell.ph { box-shadow: inset 0 0 0 2px var(--playhead), 0 0 14px -2px var(--playhead); background: color-mix(in srgb, var(--playhead) 10%, var(--cell)); }
+.tile { color: #13081f; --c: var(--fx); box-shadow: 0 0 10px -1px color-mix(in srgb, var(--c) 75%, transparent), inset 0 -2px 0 rgba(0, 0, 0, .18); }
+.cat-drum { --c: var(--drum); } .cat-bass { --c: var(--bass); } .cat-harm { --c: var(--harm); } .cat-lead { --c: var(--lead); } .cat-fx { --c: var(--fx); }
+.shape-tri { box-shadow: none; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c) 80%, transparent)); }
+.shape-ring { box-shadow: 0 0 8px -1px var(--c), inset 0 0 6px -1px var(--c); }
+.cell.hit .tile { filter: brightness(1.35) drop-shadow(0 0 10px var(--c)) drop-shadow(0 0 4px #fff); }
+.cell.lv2::before { text-shadow: 0 0 6px var(--gold); }
+button.btn { background: var(--accent); border: none; color: #1a0718; box-shadow: 0 0 18px -4px #ff3d9a, inset 0 1px 0 rgba(255, 255, 255, .35); padding: 10.5px 17.5px; transition: filter .12s, box-shadow .12s; }
+button.btn:hover:not(:disabled) { filter: brightness(1.1); box-shadow: 0 0 24px -2px #ff3d9a, inset 0 1px 0 rgba(255, 255, 255, .35); }
+button.btn.small { padding: 6.5px 12.5px; }
+button.btn.ghost { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--drum) 45%, var(--line)); }
+button.btn.ghost:hover:not(:disabled) { box-shadow: inset 0 0 0 1.5px var(--drum), 0 0 14px -4px var(--drum); filter: none; }
+.row.extras .btn.small { padding: 5.5px 11.5px; }
+.ranks button[aria-pressed="true"] { background: var(--accent); color: #1a0718; box-shadow: 0 0 14px -3px #ff3d9a; }
+.relic { box-shadow: 0 0 8px -2px var(--gold), inset 0 0 6px -3px var(--gold); text-shadow: 0 0 6px color-mix(in srgb, var(--gold) 60%, transparent); }
+.status .life { text-shadow: 0 0 8px color-mix(in srgb, var(--life) 70%, transparent); }
+.coins { text-shadow: 0 0 8px color-mix(in srgb, var(--gold) 60%, transparent); }
+.bar { background: #1a1130; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04); }
+.bar > i { background: linear-gradient(90deg, #c2307a, var(--noise)); box-shadow: 0 0 10px var(--noise); }
+.bar.groove > i { background: linear-gradient(90deg, #ff7a59, var(--lead), #ffd166); box-shadow: 0 0 10px var(--lead); }
+.bar.fever > i { background: linear-gradient(90deg, var(--drum), var(--harm), #ff5fa2, var(--lead)); box-shadow: 0 0 14px #ff5fa2; }
+.chip, .bgm-chip, .offer { background: color-mix(in srgb, var(--surface) 80%, transparent); }
+.chip.sel, .bgm-chip[aria-pressed="true"], .offer[aria-pressed="true"] { border-color: var(--drum); box-shadow: 0 0 0 1px var(--drum), 0 0 14px -3px var(--drum); }
+.offer:hover:not(:disabled) { border-color: var(--harm); box-shadow: 0 0 16px -4px var(--harm); }
+.route i.now { box-shadow: 0 0 8px var(--lead); }
+.route i.boss { box-shadow: 0 0 6px var(--noise); }
+.title-steps span.on { box-shadow: 0 0 8px var(--lead); }
+.title-steps span:nth-child(odd).on { box-shadow: 0 0 8px var(--drum); }
+.toast { background: #1f1240; color: var(--fg); border: 1px solid var(--harm); box-shadow: 0 0 24px -4px var(--harm); }
+.overlay { background: color-mix(in srgb, #05020c 78%, transparent); backdrop-filter: blur(5px); }
+.daily { background: linear-gradient(90deg, color-mix(in srgb, #ff3d9a 14%, transparent), color-mix(in srgb, var(--lead) 8%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #ff3d9a 25%, transparent); }
+select { background: #1a1130; }
+.setting input[type=range] { accent-color: #ff5fa2; }
+.coach { border-color: var(--lead); box-shadow: 0 0 20px -6px var(--lead); }
+.ach.got .mark { box-shadow: 0 0 8px var(--gold); }
+@media (prefers-reduced-motion: reduce) { .cell.ph { box-shadow: inset 0 0 0 2px var(--playhead); } }
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -1000,7 +1031,7 @@ function damage(e, amount, color, src) {
   G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
   G.texts.push({ lane: e.lane, x: e.x, txt: String(d), life: d >= 15 ? .9 : .6, big: d >= 15 });
   if (e.hp <= 0) {
-    G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', life: .3, max: .3, r: e.r });
+    G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', ecolor: enemyColor(e.type), life: .3, max: .3, r: e.r });
     for (let k = 0; k < 7; k++) { const a = Math.random() * Math.PI * 2, v = 30 + Math.random() * 50;
       G.fx.push({ kind: 'bit', lane: e.lane, x: e.x, dx: Math.cos(a) * v, dy: Math.sin(a) * v, color, life: .45, max: .45 }); }
     if (e.type === 'split') { spawn('mini', e.lane, Math.min(1, e.x + .03)); spawn('mini', e.lane, Math.min(1, e.x + .08)); }
@@ -1207,9 +1238,15 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue('--
 function laneY(l) { const h = CH / LANES; return h * l + h / 2; }
 const BASE_X = 26, QUEUE_W = 50;
 function xPix(x) { return BASE_X + 10 + x * (CW - BASE_X - 22 - QUEUE_W); }
+// Each enemy type has its own neon colour (shape still tells them apart, also in colour-blind mode).
+const ENEMY_COLOR = { dot: '#ff5fa2', dash: '#ffb547', block: '#a98bff', shield: '#4de1ff', mirror: '#e9f0ff', stealth: '#8f86c9', split: '#ff7ad9',
+  mini: '#ff9ac4', hopper: '#d4ff4d', healer: '#3dffc8' };
+const enemyColor = type => ENEMY_COLOR[type] || '#ff3d6e';
 function drawShape(shape, x, y, r, C, opt = {}) {
-  cx.fillStyle = opt.flash ? C.noise : C.enemy;
-  cx.strokeStyle = C.enemy;
+  const col = opt.color || C.enemy;
+  cx.fillStyle = opt.flash ? '#ffffff' : col;
+  cx.strokeStyle = col;
+  if (opt.glow) { cx.shadowColor = col; cx.shadowBlur = opt.glow; }
   if (opt.hidden) {
     cx.save(); cx.setLineDash([3, 3]); cx.lineWidth = 1.5; cx.globalAlpha *= .6;
     cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.stroke(); cx.restore(); return;
@@ -1232,7 +1269,32 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   if (shape === 'eye') { cx.fillStyle = C.bg; cx.beginPath(); cx.arc(x, y, r * .28, 0, Math.PI * 2); cx.fill(); }
   if (shape === 'shield') { cx.lineWidth = 2.5; cx.beginPath(); cx.arc(x + 2, y, r + 2, Math.PI * .6, Math.PI * 1.4); cx.stroke(); }
   if (shape === 'mirror') { cx.strokeStyle = C.bg; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(x - r * .4, y - r * .2); cx.lineTo(x + r * .2, y - r * .5); cx.stroke(); }
+  cx.shadowBlur = 0;
   if (opt.slow) { cx.strokeStyle = C.bass; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r + 3, 0, Math.PI * 2); cx.stroke(); }
+}
+// Synthwave backdrop: grid lines rush from the far right toward the speaker, faster while the music plays.
+let gridT = 0;
+function drawBackdrop(C, dt) {
+  const lh = CH / LANES, x0 = BASE_X, x1 = CW - QUEUE_W - 4, span = x1 - x0;
+  const g = cx.createLinearGradient(x0, 0, x1, 0);
+  g.addColorStop(0, 'rgba(54,214,255,.10)'); g.addColorStop(.5, 'rgba(194,109,255,.05)'); g.addColorStop(1, 'rgba(255,61,154,.10)');
+  cx.fillStyle = g; cx.fillRect(0, 0, CW, CH);
+  for (let l = 0; l < LANES; l++) if (l % 2 === 0) { cx.fillStyle = 'rgba(255,255,255,.025)'; cx.fillRect(0, l * lh, CW, lh); }
+  const playing = G.phase === 'play' || G.listening || G.studio && G.listening;
+  gridT = (gridT + dt * (playing ? .55 * (G.speed || 1) * (G.fever > 0 ? 1.8 : 1) : .08)) % 1;
+  const N = 14;
+  cx.lineWidth = 1;
+  for (let i = 0; i < N; i++) {
+    const u = ((i + 1 - gridT) / N), x = x0 + span * Math.pow(u, 1.7);
+    const a = .05 + .22 * (1 - u);
+    cx.strokeStyle = `rgba(194,109,255,${a})`; cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, CH); cx.stroke();
+  }
+  for (let l = 1; l < LANES; l++) {
+    const y = Math.round(l * lh) + .5;
+    const lg = cx.createLinearGradient(x0, 0, x1, 0);
+    lg.addColorStop(0, 'rgba(54,214,255,.45)'); lg.addColorStop(1, 'rgba(255,61,154,.25)');
+    cx.strokeStyle = lg; cx.beginPath(); cx.moveTo(x0, y); cx.lineTo(x1, y); cx.stroke();
+  }
 }
 function drawField(dt) {
   if (!CW) sizeCanvas();
@@ -1240,16 +1302,20 @@ function drawField(dt) {
               drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') };
   cx.clearRect(0, 0, CW, CH);
   const lh = CH / LANES;
+  drawBackdrop(C, dt);
   for (let l = 0; l < LANES; l++) {
-    if (l % 2 === 0) { cx.fillStyle = C.cell; cx.globalAlpha = .45; cx.fillRect(0, l * lh, CW, lh); cx.globalAlpha = 1; }
     cx.fillStyle = C.muted; cx.font = '600 11px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.fillText(String(l + 1), 9, laneY(l));
   }
-  if (G.fever > 0) { cx.fillStyle = C.lead; cx.globalAlpha = .07 + .05 * (G.pulse || 0); cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; }
+  if (G.fever > 0) { const fg = cx.createLinearGradient(0, 0, CW, 0); fg.addColorStop(0, '#36d6ff'); fg.addColorStop(.5, '#ff5fa2'); fg.addColorStop(1, '#ffa44d');
+    cx.fillStyle = fg; cx.globalAlpha = .08 + .07 * (G.pulse || 0); cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; }
   // speaker / base line
   const pw = 3 + (G.pulse || 0) * 4;
-  cx.fillStyle = C.fg; cx.fillRect(BASE_X - 2 - pw / 2 - 1, 4, pw, CH - 8);
-  if (G.pulse > .05) { cx.strokeStyle = C.fg; cx.globalAlpha = G.pulse * .25; cx.lineWidth = 1.5;
+  cx.shadowColor = C.playhead || C.drum; cx.shadowBlur = 12 + (G.pulse || 0) * 14;
+  cx.fillStyle = C.drum; cx.fillRect(BASE_X - 2 - pw / 2 - 1, 4, pw, CH - 8);
+  cx.fillStyle = '#ffffff'; cx.fillRect(BASE_X - 2 - .75, 4, 1.5, CH - 8);
+  cx.shadowBlur = 0;
+  if (G.pulse > .05) { cx.strokeStyle = C.drum; cx.globalAlpha = G.pulse * .25; cx.lineWidth = 1.5;
     for (let k = 1; k <= 2; k++) { cx.beginPath(); cx.arc(BASE_X - 4, CH / 2, (1 - G.pulse) * 40 * k + 10, -Math.PI / 3, Math.PI / 3); cx.stroke(); }
     cx.globalAlpha = 1; }
   G.pulse = Math.max(0, (G.pulse || 0) - dt * 4);
@@ -1258,10 +1324,12 @@ function drawField(dt) {
     const a = Math.max(0, f.life / f.max);
     if (f.kind === 'lane') { cx.fillStyle = C[f.color]; cx.globalAlpha = .18 * a; cx.fillRect(BASE_X, f.lane * lh + 2, CW - BASE_X, lh - 4); }
     if (f.kind === 'hurt') { cx.fillStyle = C.life; cx.globalAlpha = .35 * a; cx.fillRect(0, f.lane * lh, CW, lh); }
-    if (f.kind === 'beam') { cx.strokeStyle = C[f.color]; cx.globalAlpha = a; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(BASE_X, laneY(f.lane)); cx.lineTo(xPix(f.x), laneY(f.lane)); cx.stroke(); }
-    if (f.kind === 'bit') { const tt = f.max - f.life; cx.fillStyle = C[f.color] || C.enemy; cx.globalAlpha = a;
-      cx.fillRect(xPix(f.x) + f.dx * tt - 2, laneY(f.lane) + f.dy * tt - 2, 4, 4); }
-    if (f.kind === 'pop') { cx.strokeStyle = C.enemy; cx.globalAlpha = a; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(xPix(f.x), laneY(f.lane), f.r + (1 - a) * 14, 0, Math.PI * 2); cx.stroke(); }
+    if (f.kind === 'beam') { cx.save(); cx.globalCompositeOperation = 'lighter'; cx.strokeStyle = C[f.color]; cx.shadowColor = C[f.color]; cx.shadowBlur = 10;
+      cx.globalAlpha = a; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(BASE_X, laneY(f.lane)); cx.lineTo(xPix(f.x), laneY(f.lane)); cx.stroke();
+      cx.strokeStyle = '#ffffff'; cx.lineWidth = 1; cx.globalAlpha = a * .8; cx.stroke(); cx.restore(); }
+    if (f.kind === 'bit') { const tt = f.max - f.life; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = C[f.color] || C.enemy; cx.shadowColor = cx.fillStyle; cx.shadowBlur = 6; cx.globalAlpha = a;
+      cx.fillRect(xPix(f.x) + f.dx * tt - 2, laneY(f.lane) + f.dy * tt - 2, 4, 4); cx.restore(); }
+    if (f.kind === 'pop') { cx.strokeStyle = f.ecolor || C.enemy; cx.globalAlpha = a; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(xPix(f.x), laneY(f.lane), f.r + (1 - a) * 14, 0, Math.PI * 2); cx.stroke(); }
     cx.globalAlpha = 1;
     f.life -= dt;
   }
@@ -1281,16 +1349,17 @@ function drawField(dt) {
     const k = perLane[o.lane]++;
     const soon = G.phase === 'build' ? o.t / 8 : (o.t - G.t) / 6;
     cx.globalAlpha = 1 - Math.max(0, Math.min(1, soon)) * .65;
-    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), ENEMIES[o.type].boss ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth });
+    drawShape(ENEMIES[o.type].shape, qx + 7 + k * 14, laneY(o.lane), ENEMIES[o.type].boss ? 7 : 5, C, { hidden: !!ENEMIES[o.type].stealth, color: enemyColor(o.type) });
   }
   cx.globalAlpha = 1;
   // enemies
   for (const e of G.enemies) {
     const x = xPix(e.x), y = laneY(e.lane), r = e.r;
-    drawShape(e.shape, x, y, r, C, { flash: e.flash > 0, slow: e.slow > 0, hidden: ENEMIES[e.type].stealth && !e.revealed });
+    const boss = ENEMIES[e.type].boss;
+    drawShape(e.shape, x, y, r, C, { flash: e.flash > 0, slow: e.slow > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, color: enemyColor(e.type), glow: boss ? 18 + (G.pulse || 0) * 12 : 10 });
     if (e.max > 3 && !(ENEMIES[e.type].stealth && !e.revealed)) { // hp bar
       cx.fillStyle = C.line; cx.fillRect(x - r, y - r - 6, r * 2, 3);
-      cx.fillStyle = C.life; cx.fillRect(x - r, y - r - 6, r * 2 * Math.max(0, e.hp / e.max), 3);
+      cx.fillStyle = enemyColor(e.type); cx.fillRect(x - r, y - r - 6, r * 2 * Math.max(0, e.hp / e.max), 3);
     }
   }
   // damage numbers
@@ -1308,11 +1377,16 @@ function drawField(dt) {
   if (G.flash > 0) { cx.fillStyle = C.lead; cx.globalAlpha = G.flash * .25; cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; G.flash = Math.max(0, G.flash - dt * 2.5); }
   if (banner) {
     const k = banner.max - banner.life, a = Math.min(1, k / .2, banner.life / .4), y = CH / 2;
-    cx.globalAlpha = a * .85; cx.fillStyle = C.bg; cx.fillRect(0, y - 30, CW, banner.sub ? 62 : 46); cx.globalAlpha = a;
-    cx.fillStyle = C[banner.color] || C.fg; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    const bh = banner.sub ? 62 : 46, bg = cx.createLinearGradient(0, 0, CW, 0);
+    bg.addColorStop(0, 'rgba(7,4,15,0)'); bg.addColorStop(.2, 'rgba(7,4,15,.88)'); bg.addColorStop(.8, 'rgba(7,4,15,.88)'); bg.addColorStop(1, 'rgba(7,4,15,0)');
+    cx.globalAlpha = a; cx.fillStyle = bg; cx.fillRect(0, y - 30, CW, bh);
+    cx.fillStyle = C[banner.color] || C.fg; cx.fillRect(CW * .2, y - 30, CW * .6, 1); cx.fillRect(CW * .2, y - 30 + bh - 1, CW * .6, 1);
+    cx.shadowColor = C[banner.color] || C.fg; cx.shadowBlur = 16;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.font = '400 26px ' + css('f-display');
     const slide = (1 - Math.min(1, k / .25)) * 30;
     cx.fillText(banner.text, (CW - QUEUE_W) / 2 + 10 + slide, y - (banner.sub ? 6 : -2));
+    cx.shadowBlur = 0;
     if (banner.sub) { cx.font = '600 12px "IBM Plex Mono", ' + css('f-body'); cx.fillStyle = C.muted; cx.fillText(banner.sub, (CW - QUEUE_W) / 2 + 10, y + 20); }
     cx.globalAlpha = 1; banner.life -= dt; if (banner.life <= 0) banner = null;
   }
