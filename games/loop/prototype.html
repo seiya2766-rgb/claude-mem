@@ -826,7 +826,9 @@ function degToMidi(reg, deg) {
   return base + 12 * o + sc[i];
 }
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
-const midiName = m => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+// Note names follow the UI language (ドレミ in Japanese, letters elsewhere).
+const noteNames = () => { const n = t('notes'); return Array.isArray(n) ? n : NOTE_NAMES; };
+const midiName = m => noteNames()[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 function autoDeg(id, lane, step) {
   const n = SCALES[G.scale].s.length;
   const prog = Math.round(PROG[step] * n / 5);
@@ -1339,7 +1341,7 @@ function drawField(dt) {
   cx.save(); cx.strokeStyle = C.line; cx.setLineDash([3, 4]); cx.lineWidth = 1;
   cx.beginPath(); cx.moveTo(qx - 4, 4); cx.lineTo(qx - 4, CH - 4); cx.stroke(); cx.restore();
   cx.fillStyle = C.muted; cx.font = '600 9px "IBM Plex Mono", monospace'; cx.textAlign = 'center';
-  cx.fillText('NEXT', qx + QUEUE_W / 2 - 2, 8);
+  cx.fillText(t('f.next'), qx + QUEUE_W / 2 - 2, 8);
   const upcoming = G.phase === 'build' ? G.plan : G.spawns.slice(G.spawnIdx);
   const horizon = G.phase === 'build' ? 8 : G.t + 6;
   const perLane = [0, 0, 0, 0];
@@ -1487,7 +1489,7 @@ function renderLegend() {
 }
 function renderStatus() {
   renderTempo(); renderLegend();
-  $('stageLabel').textContent = G.studio ? t('studio.title') : `${G.daily ? t('daily.tag') + ' ' : ''}${KITS[G.kit].name}${G.rank ? ' R' + G.rank : ''}　${G.endless ? '∞ ' + (G.col + 1) : (G.col + 1) + '/' + ROUTE_LEN} ${nodeLabel()}`;
+  $('stageLabel').textContent = G.studio ? t('studio.title') : `${G.daily ? t('daily.tag') + ' ' : ''}${KITS[G.kit].name}${G.rank ? ' ' + t('rank.short', { n: G.rank }) : ''}　${G.endless ? '∞ ' + (G.col + 1) : (G.col + 1) + '/' + ROUTE_LEN} ${nodeLabel()}`;
   $('lifeLabel').hidden = $('coinLabel').hidden = !!G.studio;
   document.querySelector('.meters').hidden = !!G.studio;
   updateKeysHint();
@@ -1720,7 +1722,7 @@ $('listenBtn').addEventListener('click', () => {
 });
 $('speedBtn').addEventListener('click', () => { G.speed = G.speed === 1 ? 2 : G.speed === 2 ? .5 : 1; renderStatus(); });
 function fillSelects() {
-  $('rootSel').innerHTML = NOTE_NAMES.map((n, i) => `<option value="${i}" ${i === G.root ? 'selected' : ''}>${n}</option>`).join('');
+  $('rootSel').innerHTML = noteNames().map((n, i) => `<option value="${i}" ${i === G.root ? 'selected' : ''}>${n}</option>`).join('');
   $('scaleSel').innerHTML = Object.entries(SCALES).map(([k, v]) => `<option value="${k}" ${k === G.scale ? 'selected' : ''}>${v.name}</option>`).join('');
 }
 $('rootSel').addEventListener('change', e => { G.root = +e.target.value; renderInfo(); });
@@ -1789,7 +1791,7 @@ function chooseNext(saved) {
   saveRun('route', opts);
   showModal(`<h2>${t('r.title')}</h2>${routeHTML(next)}
     <div class="offers ${opts.length === 2 ? 'two' : opts.length === 1 ? 'two' : ''}" id="offers">${opts.map(k => `
-      <button class="offer" data-n="${k}"><span class="kind">${k === 'boss' ? 'BOSS' : k.toUpperCase()}</span><span class="offer-name">${NODES[k].name}</span><span class="offer-desc">${NODES[k].desc}</span></button>`).join('')}</div>`);
+      <button class="offer" data-n="${k}"><span class="offer-name">${NODES[k].name}</span><span class="offer-desc">${NODES[k].desc}</span></button>`).join('')}</div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('[data-n]'); if (!b) return;
     enterNode(next, b.dataset.n);
@@ -1913,7 +1915,7 @@ function showAlbum(back) {
   showModal(`<h2>${t('al.title')}</h2><p>${list.length ? t('al.note') : t('al.empty')}</p>
     <div class="ach-list">${list.map((e, i) => `<div class="row album-row">
       <span><b>${fmt(e.d)}</b>　${e.result === 'studio' ? t('al.studio') : KITS[e.kit].name + '・' + (e.result === 'win' ? t('al.win') : t('al.lose', { c: e.col + 1, n: ROUTE_LEN }))}<br>
-      <small class="hint">${NOTE_NAMES[e.root]} ${SCALES[e.scale].name}・BGM ${t('bgm.' + e.bgm + '.name')}</small></span>
+      <small class="hint">${noteNames()[e.root]} ${SCALES[e.scale].name}・BGM ${t('bgm.' + e.bgm + '.name')}</small></span>
       <button class="btn ghost small" data-al="${i}">${t('al.play')}</button></div>`).join('')}</div>
     <div class="row"><span></span><button class="btn" id="alBack">${t('a.back')}</button></div>`);
   $('modal').querySelectorAll('[data-al]').forEach(b => b.onclick = () => playAlbum(list[+b.dataset.al]));
@@ -2003,7 +2005,7 @@ function showStart() {
       <div class="row daily"><span class="hint">${dailyLine()}</span><button class="btn small" id="dailyBtn">${t('daily.btn')}</button></div>
       <p>${saved ? t('m.chooseOverwrite') : t('m.choose')}</p>
       <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => kitLocked(k) ? `
-        <button class="offer locked" disabled><span class="kind">LOCKED</span><span class="offer-name">${v.name}</span>
+        <button class="offer locked" disabled><span class="kind">${t('m.lockTag')}</span><span class="offer-name">${v.name}</span>
           <span class="offer-desc">${t('m.locked', { n: v.unlock })}</span></button>` : `
         <button class="offer" data-kit="${k}" aria-pressed="${k === kit}">
           <span class="offer-name">${v.name}</span>
