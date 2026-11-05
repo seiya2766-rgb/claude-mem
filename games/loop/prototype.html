@@ -186,10 +186,10 @@ canvas#field.hurt { animation: hurt .25s linear; }
   .app { max-width: 1180px; }
   .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
   .side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); max-height: calc(var(--vh) * 100 - 92px); overflow-y: auto; padding: 4px 6px 4px 4px; margin: -4px -6px -4px -4px; }
-  canvas#field { height: clamp(150px, calc(var(--vh) * 24), 250px); }
+  canvas#field { height: clamp(170px, calc(var(--vh) * 29), 300px); }
   .keys { display: inline; }
   .app { padding-block: 10px 12px; }
-  #board .cell { aspect-ratio: auto; height: clamp(34px, calc(var(--vh) * 6.1), 72px); }
+  #board .cell { aspect-ratio: auto; height: clamp(32px, calc(var(--vh) * 5.5), 66px); }
   .legend { font-size: 11px; line-height: 1.5; max-height: 34px; overflow-y: auto; }
   #board .cell .tile { width: auto; height: 74%; aspect-ratio: 1; }
 }
@@ -204,7 +204,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
 .ach { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
 .ach .mark { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); margin-top: 2px; }
 .ach.got .mark { background: var(--gold); border-color: var(--gold); }
-.cx { grid-template-columns: 30px minmax(0, 1fr); align-items: center; }
+.cx { grid-template-columns: 46px minmax(0, 1fr); align-items: center; }
 .cx .tile { width: 26px; height: 26px; font-size: 11px; }
 .cx-enemy { display: inline-grid; place-items: center; width: 26px; color: var(--enemy, var(--fg)); }
 .cx-tabs { justify-content: flex-start; gap: 6px; }
@@ -293,7 +293,7 @@ select { background: #1a1130; }
 @media (prefers-reduced-motion: reduce) { .cell.ph { box-shadow: inset 0 0 0 2px var(--playhead); } }
 /* ---- UI polish: cards, pills, icons ---- */
 .e-ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: 2px; }
-.cx-ico { width: 30px; height: 30px; }
+.cx-ico { width: 46px; height: 46px; margin: -6px 0; }
 .legend span { display: inline-flex; align-items: center; gap: 2px; }
 .panel-title, .bgm .panel-title { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--fg); letter-spacing: .06em; }
 .panel-title::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--drum); box-shadow: 0 0 8px var(--drum); flex: none; }
@@ -1307,161 +1307,458 @@ function drawShape(shape, x, y, r, C, opt = {}) {
   cx.shadowBlur = 0;
   if (opt.slow) { cx.strokeStyle = C.bass; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, r + 3, 0, Math.PI * 2); cx.stroke(); }
 }
-// ---- enemy characters ----
-// Every enemy is drawn as a small neon creature facing the speaker (left). Shapes stay distinct per type,
-// so they read in colour-blind mode too. g is any 2D context (the field, or an offscreen icon canvas).
-const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
-function enemyEyes(g, pts, er, look = -1) {
-  g.save(); g.shadowBlur = 0;
-  for (const [ex, ey] of pts) {
-    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(ex, ey, er, er * 1.15, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#12081f'; g.beginPath(); g.arc(ex + look * er * .38, ey + er * .1, er * .58, 0, Math.PI * 2); g.fill();
+// ---- monsters ----
+// Every enemy is a neon monster built from sound gear and creature parts (an amp golem, a cymbal crab,
+// a metronome demon...). Drawn in layers: outer glow, shaded body, dark outline, then face and limbs.
+// They face the speaker (left). Silhouettes differ per type, so they also read in colour-blind mode.
+// g is any 2D context (the field, or an offscreen icon canvas); r is the monster's half-size.
+const INK = '#12081f';
+const rgbOf = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const mixC = (a, b, t, al = 1) => { const x = rgbOf(a), y = rgbOf(b); return `rgba(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')},${al})`; };
+const hexA = (hex, a) => mixC(hex, hex, 0, a);
+const darkHex = (h, t) => { const x = rgbOf(h), y = rgbOf(INK); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+const TAU = Math.PI * 2;
+function mBody(g, path, col, r, o, lx = -.35, ly = -.45) {
+  g.save(); g.shadowColor = col; g.shadowBlur = o.glow ?? r * .8; g.fillStyle = col; g.fill(path); g.restore();
+  const gr = g.createRadialGradient(r * lx, r * ly, r * .05, 0, 0, r * 1.5);
+  gr.addColorStop(0, mixC(col, '#ffffff', .6)); gr.addColorStop(.42, col); gr.addColorStop(1, mixC(col, INK, .72));
+  g.fillStyle = gr; g.fill(path);
+  g.lineWidth = Math.max(1, r * .08); g.strokeStyle = mixC(col, INK, .82); g.stroke(path);
+  if (o.flash) { g.fillStyle = 'rgba(255,255,255,.72)'; g.fill(path); }
+}
+function mGloss(g, x, y, rx, ry, a = .5) { g.save(); g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath(); g.ellipse(x, y, rx, ry, -.5, 0, TAU); g.fill(); g.restore(); }
+function mEye(g, x, y, s, o = {}) {
+  const shut = o.blink || 0;
+  g.save();
+  g.shadowColor = o.glow || '#fff3b0'; g.shadowBlur = s * (o.glow ? 2.4 : .8);
+  g.fillStyle = o.sclera || '#fff8e1';
+  g.beginPath(); g.ellipse(x, y, s, Math.max(s * .1, s * (o.tall || 1.1) * (1 - shut)), o.tilt || 0, 0, TAU); g.fill();
+  g.shadowBlur = 0;
+  if (shut < .6) {
+    const px = x + (o.look ?? -1) * s * .3, py = y + s * .08;
+    g.fillStyle = o.pupil || INK; g.beginPath();
+    if (o.slit) g.ellipse(px, py, s * .2, s * .8 * (1 - shut), 0, 0, TAU); else g.arc(px, py, s * .52 * (o.pupilSize || 1), 0, TAU);
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.arc(px - s * .2, py - s * .28, s * .17, 0, TAU); g.fill();
   }
+  if (o.brow) { g.strokeStyle = INK; g.lineCap = 'round'; g.lineWidth = s * .42; g.beginPath();
+    g.moveTo(x - s * 1.05, y - s * (o.brow > 0 ? 1.6 : 1.05)); g.lineTo(x + s * 1.05, y - s * (o.brow > 0 ? 1.05 : 1.6)); g.stroke(); }
   g.restore();
 }
-function drawEnemy(g, type, x, y, r, o = {}) {
-  const col = enemyColor(type), tm = o.t ?? performance.now() / 1000, seed = o.seed || 0, detail = r >= 7;
-  const boss = ENEMIES[type] && ENEMIES[type].boss;
+// Open mouth with teeth sitting on the gums. x,y: left/right corners' height; w: half width; open: depth.
+function mMouth(g, x, y, w, open, o = {}) {
+  const sm = o.smile ?? .35, n = o.teeth ?? 4, tw = 2 * w / n;
+  const upY = tx => { const t = (x + w - tx) / (2 * w); return y + 2 * t * (1 - t) * sm * open; };
+  const loY = tx => { const t = (x + w - tx) / (2 * w); return y + 4 * t * (1 - t) * open; };
+  const p = new Path2D(); p.moveTo(x - w, y); p.quadraticCurveTo(x, y + sm * open, x + w, y); p.quadraticCurveTo(x, y + open * 2, x - w, y); p.closePath();
   g.save();
-  if (o.hidden) {
-    g.translate(x, y); g.globalAlpha *= .45 + .15 * Math.sin(tm * 6 + seed);
-    g.strokeStyle = col; g.lineWidth = 1.5; g.setLineDash([3, 3]);
-    g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); g.stroke(); g.restore(); return;
+  g.fillStyle = '#2b0718'; g.fill(p);
+  g.save(); g.clip(p);
+  if (o.tongue) { g.fillStyle = '#ff4f7b'; g.beginPath(); g.ellipse(x + w * .1, y + open * 1.2, w * .55, open * .55, 0, 0, TAU); g.fill(); }
+  g.fillStyle = '#fffbe8';
+  for (let i = 0; i < n; i++) {
+    const tx = x - w + tw * (i + .5), big = o.fangs && (i === 0 || i === n - 1), b = upY(tx) - 1;
+    g.beginPath(); g.moveTo(tx - tw * .5, b); g.lineTo(tx + tw * .5, b); g.lineTo(tx, b + open * (big ? 1.15 : .62)); g.closePath(); g.fill();
   }
-  const hop = type === 'hopper' ? -Math.abs(Math.sin(tm * 3.2 + seed)) * r * .45 : 0;
-  const bob = o.still ? 0 : Math.sin(tm * (boss ? 1.8 : 4.5) + seed) * r * .07 + hop;
-  g.translate(x, y + bob);
-  const lw = Math.max(1.2, r * .14);
-  g.lineWidth = lw; g.lineJoin = 'round'; g.lineCap = 'round';
-  g.strokeStyle = o.flash ? '#ffffff' : col;
-  g.fillStyle = o.flash ? 'rgba(255,255,255,.9)' : hexA(col, .24);
-  g.shadowColor = col; g.shadowBlur = o.glow ?? r * .9;
-  const body = () => { g.fill(); g.stroke(); };
-  const eyeR = r * .2;
-  switch (type) {
-    case 'dash': {
-      g.save(); g.shadowBlur = 0; g.globalAlpha *= .55;
-      for (const k of [-.45, 0, .45]) { g.beginPath(); g.moveTo(r * .9, k * r); g.lineTo(r * (1.6 + Math.abs(k)), k * r); g.stroke(); }
-      g.restore();
-      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r * .8, -r * .8); g.lineTo(r * .35, 0); g.lineTo(r * .8, r * .8); g.closePath(); body();
-      if (detail) enemyEyes(g, [[-r * .05, -r * .08]], eyeR * .9);
-      break;
-    }
-    case 'block': {
-      g.beginPath(); g.roundRect(-r, -r, r * 2, r * 2, r * .28); body();
-      g.lineWidth = lw * .6; g.beginPath(); g.roundRect(-r * .6, -r * .6, r * 1.2, r * 1.2, r * .12); g.stroke();
-      g.fillStyle = col; for (const [bx, by] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.arc(bx * r * .78, by * r * .78, r * .08, 0, Math.PI * 2); g.fill(); }
-      if (detail) { enemyEyes(g, [[-r * .3, -r * .1], [r * .22, -r * .1]], eyeR * .85);
-        g.shadowBlur = 0; g.strokeStyle = col; g.lineWidth = lw * .8; g.beginPath(); g.moveTo(-r * .55, -r * .42); g.lineTo(-r * .12, -r * .28); g.moveTo(r * .45, -r * .42); g.lineTo(r * .05, -r * .28); g.stroke(); }
-      break;
-    }
-    case 'shield': {
-      g.beginPath(); g.arc(r * .18, 0, r * .78, 0, Math.PI * 2); body();
-      const on = o.immune ? 1 : .55;
-      g.save(); g.strokeStyle = o.immune ? '#ffffff' : col; g.globalAlpha *= on; g.lineWidth = lw * 2; g.shadowBlur = r * (o.immune ? 1.6 : .8);
-      g.beginPath(); g.arc(r * .18, 0, r * 1.18, Math.PI * .68, Math.PI * 1.32); g.stroke(); g.restore();
-      if (detail) enemyEyes(g, [[-r * .12, -r * .12], [r * .36, -r * .12]], eyeR * .85);
-      break;
-    }
-    case 'mirror': {
-      g.beginPath(); g.moveTo(0, -r); g.lineTo(r * .75, 0); g.lineTo(0, r); g.lineTo(-r * .75, 0); g.closePath(); body();
-      g.lineWidth = lw * .5; g.beginPath(); g.moveTo(0, -r); g.lineTo(0, r); g.moveTo(-r * .75, 0); g.lineTo(r * .75, 0); g.stroke();
-      const sh = ((tm * .7 + seed) % 1) * 2 - 1;
-      g.save(); g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = lw * .7;
-      g.beginPath(); g.moveTo(sh * r * .5 - r * .15, -r * .35); g.lineTo(sh * r * .5 + r * .15, -r * .6); g.stroke(); g.restore();
-      if (detail) enemyEyes(g, [[-r * .05, r * .28]], eyeR * .8);
-      break;
-    }
-    case 'stealth': {
-      g.globalAlpha *= .7 + .25 * Math.sin(tm * 9 + seed);
-      const w = r * .85; g.beginPath(); g.moveTo(-w, r * .9); g.lineTo(-w, -r * .1); g.arc(0, -r * .1, w, Math.PI, 0); g.lineTo(w, r * .9);
-      for (let k = 0; k < 4; k++) { const x1 = w - (k + .5) * w / 2, x2 = w - (k + 1) * w / 2; g.lineTo(x1, r * (k % 2 ? .9 : .55)); g.lineTo(x2, r * .9); }
-      g.closePath(); body();
-      if (detail) enemyEyes(g, [[-r * .32, -r * .15], [r * .18, -r * .15]], eyeR * .8);
-      break;
-    }
-    case 'split': {
-      for (const sx of [-.42, .42]) { g.beginPath(); g.arc(sx * r, 0, r * .62, 0, Math.PI * 2); body(); }
-      g.save(); g.setLineDash([2, 2]); g.lineWidth = lw * .6; g.beginPath(); g.moveTo(0, -r * .5); g.lineTo(0, r * .5); g.stroke(); g.restore();
-      if (detail) enemyEyes(g, [[-r * .5, -r * .08], [r * .34, -r * .08]], eyeR * .8);
-      break;
-    }
-    case 'hopper': {
-      g.beginPath(); g.moveTo(-r * .85, r * .35); g.arc(0, r * .35, r * .85, Math.PI, 0); g.closePath(); body();
-      const k = Math.abs(Math.sin(tm * 3.2 + seed));
-      g.beginPath(); g.moveTo(-r * .5, r * .35); g.lineTo(-r * .8, r * (.65 + k * .3)); g.lineTo(-r * 1.05, r * (.8 + k * .5));
-      g.moveTo(r * .5, r * .35); g.lineTo(r * .85, r * (.65 + k * .3)); g.lineTo(r * 1.1, r * (.8 + k * .5)); g.stroke();
-      if (detail) enemyEyes(g, [[-r * .38, -r * .45], [r * .22, -r * .45]], eyeR);
-      break;
-    }
-    case 'healer': {
-      const ph = (tm * .9 + seed) % 1;
-      g.save(); g.globalAlpha *= (1 - ph) * .7; g.lineWidth = lw * .6; g.beginPath(); g.arc(0, 0, r * (1 + ph * .7), 0, Math.PI * 2); g.stroke(); g.restore();
-      g.beginPath(); g.arc(0, 0, r * .85, 0, Math.PI * 2); body();
-      g.fillStyle = col; const a = r * .17; g.fillRect(-a, -r * .55, a * 2, r * 1.1); g.fillRect(-r * .55, -a, r * 1.1, a * 2);
-      break;
-    }
-    case 'boss': { // Tempo Thief: a clock that steals beats
-      g.beginPath(); for (let i = 0; i < 6; i++) { const an = Math.PI / 3 * i + Math.PI / 6; g[i ? 'lineTo' : 'moveTo'](r * Math.cos(an), r * Math.sin(an)); } g.closePath(); body();
-      g.lineWidth = lw * .6; g.beginPath(); g.arc(0, 0, r * .62, 0, Math.PI * 2); g.stroke();
-      for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4; g.beginPath(); g.moveTo(Math.cos(an) * r * .5, Math.sin(an) * r * .5); g.lineTo(Math.cos(an) * r * .6, Math.sin(an) * r * .6); g.stroke(); }
-      g.lineWidth = lw; g.strokeStyle = '#ffffff'; const h1 = tm * 2.2, h2 = -tm * .5;
-      g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(h1) * r * .5, Math.sin(h1) * r * .5); g.moveTo(0, 0); g.lineTo(Math.cos(h2) * r * .32, Math.sin(h2) * r * .32); g.stroke();
-      break;
-    }
-    case 'queen': {
-      g.beginPath(); g.arc(0, r * .2, r * .78, 0, Math.PI * 2); body();
-      g.fillStyle = col; g.beginPath(); g.moveTo(-r * .7, -r * .35); g.lineTo(-r * .8, -r * 1.05); g.lineTo(-r * .38, -r * .7); g.lineTo(0, -r * 1.2); g.lineTo(r * .38, -r * .7); g.lineTo(r * .8, -r * 1.05); g.lineTo(r * .7, -r * .35); g.closePath(); g.fill();
-      enemyEyes(g, [[-r * .3, r * .15], [r * .2, r * .15]], eyeR * .8);
-      break;
-    }
-    case 'reverser': {
-      g.rotate(Math.sin(tm * 1.3 + seed) * .35);
-      g.beginPath(); g.moveTo(-r * .75, -r); g.lineTo(r * .75, -r); g.lineTo(r * .08, 0); g.lineTo(r * .75, r); g.lineTo(-r * .75, r); g.lineTo(-r * .08, 0); g.closePath(); body();
-      const sand = (tm * .3 + seed) % 1; g.fillStyle = col;
-      g.beginPath(); g.moveTo(-r * .55 * (1 - sand), -r * .75 * (1 - sand) - r * .05 * sand); g.lineTo(r * .55 * (1 - sand), -r * .75 * (1 - sand) - r * .05 * sand); g.lineTo(0, -r * .05); g.closePath(); g.fill();
-      g.beginPath(); g.moveTo(-r * .55 * sand, r * .85); g.lineTo(r * .55 * sand, r * .85); g.lineTo(0, r * (.85 - .6 * sand)); g.closePath(); g.fill();
-      break;
-    }
-    case 'warden': {
-      g.beginPath(); g.moveTo(-r * 1.1, 0); g.quadraticCurveTo(0, -r * 1.25, r * 1.1, 0); g.quadraticCurveTo(0, r * 1.25, -r * 1.1, 0); g.closePath(); body();
-      const px = Math.sin(tm * .8 + seed) * r * .2 - r * .1;
-      g.beginPath(); g.arc(px, 0, r * .42, 0, Math.PI * 2); g.stroke();
-      g.save(); g.shadowBlur = 0; g.fillStyle = '#12081f'; g.beginPath(); g.arc(px, 0, r * .22, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(px - r * .08, -r * .08, r * .07, 0, Math.PI * 2); g.fill(); g.restore();
-      g.lineWidth = lw * .7; for (const k of [-.6, -.2, .2, .6]) { g.beginPath(); g.moveTo(k * r, -r * .55 * Math.cos(k)); g.lineTo(k * r * 1.2, -r * .95); g.stroke(); }
-      break;
-    }
-    case 'brood': {
-      for (const [bx, by, br] of [[-.45, -.32, .55], [.45, -.32, .55], [0, .42, .6]]) {
-        g.beginPath(); g.arc(bx * r, by * r, br * r, 0, Math.PI * 2); body();
-        enemyEyes(g, [[bx * r - r * .1, by * r - r * .05]], eyeR * .7); g.shadowBlur = r * .9;
-      }
-      break;
-    }
-    case 'phantom': {
-      g.globalAlpha *= .75 + .25 * Math.sin(tm * 5 + seed);
-      g.beginPath(); g.moveTo(0, -r * 1.05); g.quadraticCurveTo(r * 1.05, -r * .9, r * .85, r * .1); g.quadraticCurveTo(r * .5, r * .9, 0, r * 1.05);
-      g.quadraticCurveTo(-r * .5, r * .9, -r * .85, r * .1); g.quadraticCurveTo(-r * 1.05, -r * .9, 0, -r * 1.05); g.closePath(); body();
-      g.save(); g.shadowBlur = 0; g.fillStyle = '#12081f';
-      for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * r * .12, -r * .15); g.lineTo(sx * r * .62, -r * .38); g.lineTo(sx * r * .5, r * .02); g.closePath(); g.fill(); }
-      g.restore();
-      g.lineWidth = lw * .6; g.beginPath(); g.moveTo(-r * .3, r * .5); g.quadraticCurveTo(0, r * .35, r * .3, r * .5); g.stroke();
-      break;
-    }
-    case 'mini': g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); body(); if (detail) enemyEyes(g, [[-r * .15, -r * .1]], eyeR * 1.2); break;
-    default: // dot
-      g.beginPath(); g.arc(0, 0, r * .9, 0, Math.PI * 2); body();
-      if (detail) enemyEyes(g, [[-r * .32, -r * .12], [r * .18, -r * .12]], eyeR);
+  if (o.lower) for (let i = 1; i < n; i++) {
+    const tx = x - w + tw * i, b = loY(tx) + 1;
+    g.beginPath(); g.moveTo(tx - tw * .42, b); g.lineTo(tx + tw * .42, b); g.lineTo(tx, b - open * .5); g.closePath(); g.fill();
   }
+  g.restore();
+  g.lineWidth = Math.max(.8, w * .1); g.strokeStyle = INK; g.stroke(p);
+  g.restore();
+}
+function mHorn(g, x, y, len, ang, w) {
+  g.save(); g.translate(x, y); g.rotate(ang);
+  const p = new Path2D(); p.moveTo(-w, 0); p.quadraticCurveTo(-w * .5, -len * .65, w * .55, -len); p.quadraticCurveTo(w * .3, -len * .45, w, 0); p.closePath();
+  const gr = g.createLinearGradient(0, 0, 0, -len); gr.addColorStop(0, '#3a2350'); gr.addColorStop(.55, '#d9c7ef'); gr.addColorStop(1, '#fff6e6');
+  g.fillStyle = gr; g.fill(p); g.lineWidth = Math.max(.8, w * .32); g.strokeStyle = INK; g.stroke(p);
+  g.restore();
+}
+function mLimb(g, pts, w, col) {
+  g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+  g.strokeStyle = INK; g.lineWidth = w + Math.max(1.5, w * .55); g.stroke();
+  g.strokeStyle = col; g.lineWidth = w; g.stroke();
+  g.restore();
+}
+function mClaw(g, x, y, s, ang, col = '#fff6e6') { // three small talons
+  g.save(); g.translate(x, y); g.rotate(ang); g.strokeStyle = INK; g.lineCap = 'round';
+  for (const k of [-.55, 0, .55]) { g.lineWidth = s * .55; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-s * .8, k * s * .6, -s * 1.2, k * s * 1.1); g.stroke(); }
+  g.strokeStyle = col; for (const k of [-.55, 0, .55]) { g.lineWidth = s * .28; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-s * .8, k * s * .6, -s * 1.2, k * s * 1.1); g.stroke(); }
+  g.restore();
+}
+const blinkOf = (tm, seed, period = 3.6) => { const ph = (tm + seed * 1.7) % period; return ph < .16 ? Math.sin(ph / .16 * Math.PI) : 0; };
+const circ = (x, y, r) => { const p = new Path2D(); p.arc(x, y, r, 0, TAU); return p; };
+const ell = (x, y, rx, ry, rot = 0) => { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, TAU); return p; };
+
+const MONSTERS = {
+  // Noise Slime: a wobbling blob full of static, with a toothy grin.
+  dot(g, r, c, o) {
+    const { tm, seed } = o, w = Math.sin(tm * 4 + seed);
+    for (const [dx, h] of [[-.3, .28], [.35, .2]]) mBody(g, ell(dx * r, r * .7, r * .12, r * h * (1 + .3 * Math.sin(tm * 2 + dx * 9))), c, r, { ...o, glow: 0 });
+    const p = new Path2D(), N = 26;
+    for (let i = 0; i <= N; i++) {
+      const a = TAU * i / N, rr = r * (.9 + .05 * Math.sin(a * 3 + tm * 5 + seed));
+      const x = Math.cos(a) * rr * (1 + .05 * w); let y = Math.sin(a) * rr * (1 - .06 * w) - r * .05;
+      if (y > r * .6) y = r * .6 + (y - r * .6) * .25;
+      i ? p.lineTo(x, y) : p.moveTo(x, y);
+    }
+    p.closePath(); mBody(g, p, c, r, o);
+    g.save(); g.clip(p);
+    for (let i = 0; i < 9; i++) { const k = Math.floor(tm * 10 + i * 7 + seed * 13); const sx = Math.sin(k * 12.9898) * .7, sy = Math.sin(k * 78.233) * .6;
+      g.fillStyle = i % 2 ? 'rgba(255,255,255,.35)' : 'rgba(18,8,31,.35)'; g.fillRect(sx * r, sy * r, r * .09, r * .09); }
+    g.restore();
+    mGloss(g, -r * .42, -r * .55, r * .2, r * .1);
+    mEye(g, -r * .4, -r * .2, r * .25, { blink: o.blink, brow: 1 });
+    mEye(g, r * .12, -r * .24, r * .2, { blink: o.blink, brow: -1 });
+    mMouth(g, -r * .12, r * .18, r * .38, r * (.12 + o.beat * .08), { teeth: 5, fangs: true });
+  },
+  // Static Bat: flaps fast and fangs first.
+  dash(g, r, c, o) {
+    const { tm, seed } = o, f = Math.sin(tm * 20 + seed), s = .62 + .38 * f;
+    g.save(); g.strokeStyle = hexA(c, .5); g.lineWidth = Math.max(1, r * .09);
+    for (const k of [-.25, 0, .25]) { g.beginPath(); g.moveTo(r * .85, k * r); g.lineTo(r * (1.55 + Math.abs(k)), k * r); g.stroke(); }
+    g.restore();
+    const wing = darkHex(c, .18);
+    for (const sg of [-1, 1]) {
+      const p = new Path2D(); p.moveTo(-r * .05, sg * r * .12);
+      p.quadraticCurveTo(-r * .05, sg * r * 1.1 * s, r * .45, sg * r * 1.32 * s);
+      p.quadraticCurveTo(r * .52, sg * r * .9 * s, r * .9, sg * r * .98 * s);
+      p.quadraticCurveTo(r * .85, sg * r * .62 * s, r * 1.22, sg * r * .55 * s);
+      p.quadraticCurveTo(r * .8, sg * r * .3, r * .45, sg * r * .15); p.closePath();
+      mBody(g, p, wing, r, { ...o, glow: r * .25 }, .2, sg * -.2);
+      g.save(); g.strokeStyle = mixC(c, '#ffffff', .45); g.lineWidth = Math.max(.8, r * .055);
+      g.beginPath(); for (const [bx, by] of [[.45, 1.28], [.9, .95], [1.18, .55]]) { g.moveTo(r * .05, sg * r * .18); g.lineTo(bx * r, sg * by * r * s); } g.stroke(); g.restore();
+    }
+    mBody(g, ell(r * .28, r * .02, r * .46, r * .34), darkHex(c, .1), r, { ...o, glow: r * .3 });
+    g.save(); g.strokeStyle = mixC(c, INK, .5); g.lineWidth = Math.max(.8, r * .04); for (const k of [.12, .32, .52]) { g.beginPath(); g.moveTo(k * r, -r * .25); g.quadraticCurveTo(k * r + r * .06, 0, k * r, r * .26); g.stroke(); } g.restore();
+    const h = new Path2D(); h.moveTo(-r * .62, -r * .18); h.lineTo(-r * .66, -r * .82); h.lineTo(-r * .4, -r * .4); h.lineTo(-r * .18, -r * .44); h.lineTo(-r * .06, -r * .86); h.lineTo(r * .04, -r * .26);
+    h.arc(-r * .3, -r * .02, r * .4, -.75, Math.PI * 1.05); h.closePath();
+    mBody(g, h, c, r, { ...o, glow: r * .4 });
+    mGloss(g, -r * .45, -r * .25, r * .1, r * .05);
+    mEye(g, -r * .46, -r * .08, r * .13, { sclera: '#ff5a4a', glow: '#ff2a2a', slit: true, pupil: '#2b0010', brow: 1, blink: o.blink });
+    mEye(g, -r * .14, -r * .1, r * .12, { sclera: '#ff5a4a', glow: '#ff2a2a', slit: true, pupil: '#2b0010', brow: -1, blink: o.blink });
+    mMouth(g, -r * .32, r * .16, r * .18, r * .07, { teeth: 2, fangs: true, smile: .1 });
+  },
+  // Amp Golem: a speaker cabinet that stomps, with a grille for a jaw.
+  block(g, r, c, o) {
+    const { tm, seed } = o, st = Math.abs(Math.sin(tm * 3 + seed));
+    const dark = darkHex(c, .45);
+    mLimb(g, [[r * .7, -r * .05], [r * 1.05, r * .3], [r * .95, r * .62]], r * .26, dark);
+    mBody(g, circ(r * .95, r * .65, r * .2), dark, r, { ...o, glow: 0 });
+    for (const [fx, k] of [[-.62, 0], [.2, 1]]) { const lift = (k ? st : 1 - st) * r * .08;
+      const p = new Path2D(); p.roundRect(fx * r, r * .72 - lift, r * .45, r * .28, r * .08); mBody(g, p, dark, r, { ...o, glow: 0 }); }
+    const body = new Path2D(); body.roundRect(-r * .9, -r * .88, r * 1.8, r * 1.66, r * .22); mBody(g, body, c, r, o);
+    g.save(); g.clip(body); g.fillStyle = 'rgba(18,8,31,.28)'; g.fillRect(-r, -r * .88, r * 2, r * .3); g.restore();
+    g.fillStyle = mixC(c, '#ffffff', .5); for (const kx of [.22, .48, .72]) { g.beginPath(); g.arc(kx * r, -r * .74, r * .065, 0, TAU); g.fill(); }
+    const visor = new Path2D(); visor.roundRect(-r * .72, -r * .55, r * 1.25, r * .32, r * .1); g.fillStyle = INK; g.fill(visor);
+    for (const ex of [-.4, .12]) { g.save(); g.shadowColor = '#ffd23f'; g.shadowBlur = r * .5; g.fillStyle = '#fff2a8';
+      g.beginPath(); g.ellipse(ex * r, -r * .39, r * .14, r * .07 * (1 - (o.blink || 0) * .8), ex < 0 ? .25 : -.25, 0, TAU); g.fill(); g.restore(); }
+    const op = o.beat * r * .1;
+    const grille = new Path2D(); grille.roundRect(-r * .7, -r * .08, r * 1.3, r * .62 + op, r * .1);
+    g.fillStyle = '#1b0b2e'; g.fill(grille);
+    g.save(); g.clip(grille);
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .5; g.strokeStyle = hexA(c, .8); g.lineWidth = Math.max(1, r * .06);
+    for (const k of [1, .62, .3]) { g.beginPath(); g.arc(-r * .05, r * .25 + op / 2, r * .26 * k * (1 + o.beat * .15), 0, TAU); g.stroke(); } g.restore();
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1; for (let k = -10; k < 10; k++) { g.beginPath(); g.moveTo(k * r * .1, -r * .1); g.lineTo(k * r * .1 + r * .7, r * .6 + op); g.stroke(); }
+    g.fillStyle = '#fffbe8'; for (let i = 0; i < 6; i++) { const tx = -r * .7 + r * 1.3 * (i + .5) / 6;
+      g.beginPath(); g.moveTo(tx - r * .1, -r * .09); g.lineTo(tx + r * .1, -r * .09); g.lineTo(tx, r * .08); g.closePath(); g.fill(); }
+    g.restore();
+    g.lineWidth = Math.max(1, r * .06); g.strokeStyle = INK; g.stroke(grille);
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .4; g.strokeStyle = mixC(c, '#ffffff', .6); g.lineWidth = Math.max(.8, r * .045);
+    g.beginPath(); g.moveTo(r * .74, -r * .3); g.lineTo(r * .62, -r * .12); g.lineTo(r * .78, r * .02); g.lineTo(r * .66, r * .2); g.stroke(); g.restore();
+    g.fillStyle = INK; for (const [bx, by] of [[-.8, -.78], [.8, -.78], [-.8, .68], [.8, .68]]) { g.beginPath(); g.arc(bx * r, by * r, r * .055, 0, TAU); g.fill(); }
+    mLimb(g, [[-r * .82, -r * .05], [-r * 1.12, r * .22]], r * .26, mixC(c, INK, .15));
+    mBody(g, circ(-r * 1.15, r * .28, r * .22), c, r, { ...o, glow: 0 });
+  },
+  // Cymbal Crab: scuttles behind a cymbal that blocks hits on even beats.
+  shield(g, r, c, o) {
+    const { tm, seed } = o, legC = mixC(c, INK, .3);
+    for (const k of [-1, 1]) for (let i = 0; i < 3; i++) {
+      const ph = Math.sin(tm * 9 + i * 2.1 + (k > 0 ? Math.PI : 0) + seed) * r * .1, bx = r * (.0 + i * .3);
+      mLimb(g, [[bx, k * r * .3], [bx + r * .12 + ph, k * r * .82], [bx - r * .05 + ph, k * r * 1.02]], r * .1, legC);
+    }
+    for (let i = 0; i < 3; i++) { const p = new Path2D(); const sx = r * (.45 + i * .18), sy = -r * (.5 - i * .08);
+      p.moveTo(sx - r * .1, sy + r * .05); p.lineTo(sx + r * .02, sy - r * .22); p.lineTo(sx + r * .1, sy + r * .08); mBody(g, p, c, r, { ...o, glow: 0 }); }
+    const shell = ell(r * .18, 0, r * .78, r * .58); mBody(g, shell, c, r, o);
+    g.save(); g.clip(shell); g.strokeStyle = mixC(c, INK, .55); g.lineWidth = Math.max(.8, r * .05);
+    for (const k of [.35, .6]) { g.beginPath(); g.ellipse(r * .35, r * .05, r * k, r * k * .75, 0, Math.PI * .6, Math.PI * 1.4); g.stroke(); } g.restore();
+    mGloss(g, -r * .05, -r * .32, r * .22, r * .08);
+    for (const [sx, tx2] of [[-.28, -.42], [.0, -.08]]) {
+      mLimb(g, [[sx * r, -r * .3], [tx2 * r, -r * .68]], r * .08, c);
+      mEye(g, tx2 * r, -r * .76, r * .14, { blink: o.blink });
+    }
+    mMouth(g, -r * .5, r * .1, r * .14, r * .06, { teeth: 3, smile: .1 });
+    mLimb(g, [[-r * .35, r * .22], [-r * .72, r * .28]], r * .14, c);
+    const on = o.immune;
+    g.save(); g.shadowColor = on ? '#ffffff' : '#ffd166'; g.shadowBlur = r * (on ? 1.4 : .5);
+    const cy = ell(-r * .95, 0, r * .22, r * .98);
+    const cg = g.createLinearGradient(-r * .95, -r, -r * .95, r); cg.addColorStop(0, on ? '#ffffff' : '#fff1b8'); cg.addColorStop(.5, on ? '#ffe9a0' : '#ffc24d'); cg.addColorStop(1, '#a8701a');
+    g.fillStyle = cg; g.fill(cy); g.restore();
+    g.lineWidth = Math.max(.8, r * .05); g.strokeStyle = '#5a3a08'; g.stroke(cy);
+    g.strokeStyle = 'rgba(90,58,8,.6)'; for (const k of [.7, .42]) { g.beginPath(); g.ellipse(-r * .95, 0, r * .22 * k, r * .98 * k, 0, 0, TAU); g.stroke(); }
+    g.fillStyle = '#7a5210'; g.beginPath(); g.ellipse(-r * .95, 0, r * .06, r * .16, 0, 0, TAU); g.fill();
+    if (o.flash) { g.fillStyle = 'rgba(255,255,255,.6)'; g.fill(cy); }
+    mClaw(g, -r * .78, r * .3, r * .16, -.4, mixC(c, '#ffffff', .4));
+  },
+  // Prism Wisp: a faceted crystal eye with shards orbiting it.
+  mirror(g, r, c, o) {
+    const { tm, seed } = o;
+    const shard = (a, front) => { const x = Math.cos(a) * r * 1.1, y = Math.sin(a) * r * .5; if ((Math.sin(a) > 0) !== front) return;
+      g.save(); g.translate(x, y); g.rotate(a * 2);
+      const p = new Path2D(); p.moveTo(0, -r * .26); p.lineTo(r * .13, 0); p.lineTo(0, r * .26); p.lineTo(-r * .13, 0); p.closePath(); mBody(g, p, c, r * .5, o); g.restore(); };
+    const as = [0, 1, 2].map(i => tm * 1.6 + seed + i * TAU / 3);
+    as.forEach(a => shard(a, false));
+    const p = new Path2D(); p.moveTo(0, -r); p.lineTo(r * .72, 0); p.lineTo(0, r); p.lineTo(-r * .72, 0); p.closePath();
+    mBody(g, p, c, r, o);
+    const facet = (pts, a) => { g.fillStyle = a; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x * r, y * r) : g.moveTo(x * r, y * r)); g.closePath(); g.fill(); };
+    facet([[0, -1], [-.72, 0], [0, 0]], 'rgba(255,255,255,.35)'); facet([[0, -1], [.72, 0], [0, 0]], 'rgba(255,255,255,.12)');
+    facet([[0, 1], [.72, 0], [0, 0]], 'rgba(18,8,31,.3)'); facet([[0, 1], [-.72, 0], [0, 0]], 'rgba(18,8,31,.12)');
+    g.save(); g.clip(p); const sw = ((tm * .6 + seed) % 1.6) - .8; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = r * .12;
+    g.beginPath(); g.moveTo((sw - .3) * r, r); g.lineTo((sw + .3) * r, -r); g.stroke(); g.restore();
+    mEye(g, -r * .05, 0, r * .3, { sclera: '#ffe6fb', glow: '#ff4fd8', slit: true, pupil: '#5a0047', blink: o.blink, tall: 1.2 });
+    as.forEach(a => shard(a, true));
+  },
+  // Shade: a ghost that only hi-hats can see. Hidden, it is just a pair of eyes in the dark.
+  stealth(g, r, c, o) {
+    const { tm, seed } = o;
+    g.globalAlpha *= .82;
+    for (const sg of [-1, 1]) mLimb(g, [[-r * .45, sg * r * .25], [-r * .85, sg * r * .4], [-r * 1.05, sg * r * .25]], r * .12, mixC(c, '#ffffff', .2));
+    for (const sg of [-1, 1]) mClaw(g, -r * 1.05, sg * r * .25, r * .14, sg * .3, '#f2ecff');
+    const p = new Path2D(); p.moveTo(-r * .72, r * .1); p.arc(0, -r * .1, r * .72, Math.PI, Math.PI * 1.98);
+    p.quadraticCurveTo(r * 1.0, r * .2, r * 1.45, r * .15 + Math.sin(tm * 5 + seed) * r * .15);
+    for (let k = 0; k < 5; k++) { const x1 = r * (1.2 - k * .45), y1 = r * (.75 + (k % 2 ? -.12 : .1) + .1 * Math.sin(tm * 6 + k + seed));
+      p.quadraticCurveTo(x1 + r * .2, y1 - r * .25, x1 - r * .05, y1); }
+    p.closePath(); mBody(g, p, c, r, o);
+    mEye(g, -r * .32, -r * .22, r * .18, { sclera: INK, pupil: '#fff3a0', pupilSize: .45, glow: '#fff3a0', blink: o.blink });
+    mEye(g, r * .06, -r * .24, r * .16, { sclera: INK, pupil: '#fff3a0', pupilSize: .45, glow: '#fff3a0', blink: o.blink });
+    g.fillStyle = INK; g.beginPath(); g.ellipse(-r * .14, r * .2, r * .13, r * (.15 + o.beat * .08), 0, 0, TAU); g.fill();
+  },
+  // Twin Slime: two heads sharing one body; it splits in two when defeated.
+  split(g, r, c, o) {
+    const { tm, seed } = o, w = Math.sin(tm * 4 + seed);
+    mBody(g, ell(0, r * .32, r * .5, r * .26), c, r, { ...o, glow: 0 });
+    const head = (x, y, s, ph, front) => {
+      const p = ell(x, y, s * (1 + .05 * ph), s * (1 - .06 * ph)); mBody(g, p, c, r, o);
+      mGloss(g, x - s * .4, y - s * .55, s * .22, s * .1);
+      mEye(g, x - s * .12, y - s * .22, s * .36, { blink: o.blink, brow: front ? 1 : -1 });
+      mMouth(g, x - s * .1, y + s * .3, s * .42, s * (.16 + o.beat * .1), { teeth: 3, fangs: true });
+    };
+    head(r * .4, r * .02, r * .55, -w, false);
+    head(-r * .35, -r * .04, r * .62, w, true);
+  },
+  // Imp: tiny, horned, one big eye.
+  mini(g, r, c, o) {
+    const { tm, seed } = o, k = Math.abs(Math.sin(tm * 8 + seed));
+    for (const fx of [-.35, .3]) mBody(g, ell(fx * r, r * .85, r * .2, r * .12), darkHex(c, .4), r, { ...o, glow: 0 });
+    mHorn(g, -r * .45, -r * .55, r * .55, -.5, r * .16);
+    mHorn(g, r * .25, -r * .65, r * .5, .35, r * .15);
+    g.save(); g.translate(0, -k * r * .08); mBody(g, circ(0, 0, r * .85), c, r, o);
+    mGloss(g, -r * .35, -r * .45, r * .2, r * .1);
+    mEye(g, -r * .12, -r * .12, r * .38, { blink: o.blink });
+    mMouth(g, -r * .1, r * .38, r * .32, r * .1, { teeth: 2, fangs: true, smile: .2 });
+    g.restore();
+  },
+  // Bass Toad: leaps lane to lane on huge legs.
+  hopper(g, r, c, o) {
+    const { tm, seed } = o, k = Math.abs(Math.sin(tm * 3.2 + seed));
+    g.translate(0, -k * r * .45);
+    const legC = mixC(c, INK, .25);
+    const thigh = [r * .35, r * .25], knee = [r * (.85 + .25 * k), r * (.05 + .3 * k)], foot = [r * (.6 + .75 * k), r * (.65 + .1 * k)];
+    mLimb(g, [thigh, knee, foot], r * .2, legC);
+    mBody(g, ell(foot[0] + r * .05, foot[1] + r * .05, r * .2, r * .08), darkHex(c, .25), r, { ...o, glow: 0 });
+    const b = new Path2D(); b.ellipse(0, r * .12, r * .82, r * .52, -.12, 0, TAU);
+    b.moveTo(-r * .2, -r * .42); b.arc(-r * .42, -r * .42, r * .22, 0, TAU); b.moveTo(r * .1, -r * .48); b.arc(-r * .1, -r * .48, r * .2, 0, TAU);
+    mBody(g, b, c, r, o);
+    g.fillStyle = mixC(c, INK, .45, .6); for (const [sx, sy, sr] of [[.35, -.15, .12], [.55, .15, .09], [.15, .05, .07]]) { g.beginPath(); g.arc(sx * r, sy * r, sr * r, 0, TAU); g.fill(); }
+    mGloss(g, r * .1, -r * .2, r * .25, r * .08);
+    mEye(g, -r * .42, -r * .44, r * .15, { blink: o.blink, slit: true });
+    mEye(g, -r * .1, -r * .5, r * .14, { blink: o.blink, slit: true });
+    const tongue = ((tm + seed) % 2.6) < .22;
+    if (tongue) { g.save(); g.strokeStyle = '#ff4f7b'; g.lineWidth = r * .1; g.lineCap = 'round'; g.beginPath(); g.moveTo(-r * .6, r * .2); g.lineTo(-r * 1.5, r * .1); g.stroke();
+      g.fillStyle = '#ff4f7b'; g.beginPath(); g.arc(-r * 1.5, r * .1, r * .1, 0, TAU); g.fill(); g.restore(); }
+    mMouth(g, -r * .42, r * .14, r * .38, r * (.06 + o.beat * .06), { teeth: 0, smile: -.2, tongue: true });
+    mLimb(g, [[-r * .35, r * .5], [-r * .55, r * .78]], r * .12, legC);
+  },
+  // Mender Jelly: a jellyfish that heals its lane with every pulse.
+  healer(g, r, c, o) {
+    const { tm, seed } = o, sq = Math.sin(tm * 3 + seed), ph = (tm * .9 + seed) % 1;
+    g.save(); g.globalAlpha *= (1 - ph) * .7; g.strokeStyle = c; g.lineWidth = Math.max(1, r * .08); g.beginPath(); g.arc(0, -r * .1, r * (1 + ph * .8), 0, TAU); g.stroke(); g.restore();
+    for (let i = 0; i < 5; i++) { const bx = r * (-.5 + i * .25), pts = [];
+      for (let j = 0; j <= 6; j++) pts.push([bx + Math.sin(tm * 4 + j * .8 + i + seed) * r * .1 + j * r * .06, r * (.15 + j * .16)]);
+      mLimb(g, pts, Math.max(1, r * .07), mixC(c, '#ffffff', .3)); }
+    const s = 1 + sq * .06;
+    const p = new Path2D(); p.moveTo(-r * .85 * s, r * .1);
+    p.bezierCurveTo(-r * .85 * s, -r * 1.05 / s, r * .85 * s, -r * 1.05 / s, r * .85 * s, r * .1);
+    for (let k = 0; k < 4; k++) { const x0 = r * .85 * s - (k + 1) * r * .425 * s; p.quadraticCurveTo(x0 + r * .21 * s, r * .3, x0, r * .1); }
+    p.closePath(); g.save(); g.globalAlpha *= .9; mBody(g, p, c, r, o); g.restore();
+    g.save(); g.shadowColor = '#ffffff'; g.shadowBlur = r * .6; g.fillStyle = '#eafff8'; const a = r * .09, cyy = -r * .38;
+    g.fillRect(-a, cyy - r * .24, a * 2, r * .48); g.fillRect(-r * .24, cyy - a, r * .48, a * 2); g.restore();
+    mGloss(g, -r * .4, -r * .55, r * .18, r * .08);
+    mEye(g, -r * .42, -r * .02, r * .1, { blink: o.blink }); mEye(g, r * .38, -r * .02, r * .1, { blink: o.blink, look: 1 });
+  },
+  // Metronome Demon (Tempo Thief): horns, a grin, and a pendulum that swings out of time.
+  boss(g, r, c, o) {
+    const { tm, seed } = o;
+    mLimb(g, [[r * .65, r * .25], [r * 1.05, r * .5], [r * 1.15, r * .25]], r * .14, mixC(c, INK, .35));
+    for (const fx of [-.45, .3]) mLimb(g, [[fx * r, r * .85], [fx * r - r * .05, r * 1.1]], r * .16, mixC(c, INK, .35));
+    const p = new Path2D(); p.moveTo(-r * .42, -r * .95); p.lineTo(r * .42, -r * .95); p.lineTo(r * .85, r * .92); p.lineTo(-r * .85, r * .92); p.closePath();
+    mHorn(g, -r * .32, -r * .92, r * .7, -.55, r * .15); mHorn(g, r * .32, -r * .92, r * .7, .55, r * .15);
+    mBody(g, p, c, r, o);
+    g.save(); g.clip(p); g.fillStyle = 'rgba(18,8,31,.35)'; g.beginPath(); g.moveTo(-r * .3, r * .3); g.lineTo(r * .3, r * .3); g.lineTo(r * .45, r * .92); g.lineTo(-r * .45, r * .92); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = Math.max(.8, r * .03); for (let i = 0; i < 6; i++) { const y = r * (.38 + i * .09); g.beginPath(); g.moveTo(-r * .08, y); g.lineTo(r * .08, y); g.stroke(); } g.restore();
+    mGloss(g, -r * .2, -r * .7, r * .12, r * .06);
+    mEye(g, -r * .24, -r * .5, r * .14, { sclera: '#fff2a8', glow: '#ffd23f', brow: 1, blink: o.blink, slit: true });
+    mEye(g, r * .2, -r * .5, r * .13, { sclera: '#fff2a8', glow: '#ffd23f', brow: -1, blink: o.blink, slit: true });
+    mMouth(g, -r * .02, -r * .18, r * .42, r * (.13 + o.beat * .1), { teeth: 7, fangs: true, lower: true });
+    const a = Math.sin(tm * 3.4 + seed) * .55;
+    g.save(); g.translate(0, r * .85); g.rotate(a);
+    g.shadowColor = '#ffffff'; g.shadowBlur = r * .4; g.strokeStyle = '#e9e4ff'; g.lineWidth = Math.max(1, r * .06); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -r * 1.0); g.stroke();
+    g.shadowBlur = 0; g.fillStyle = '#e9e4ff'; g.strokeStyle = INK; g.lineWidth = Math.max(.8, r * .04);
+    g.beginPath(); g.roundRect(-r * .13, -r * .72, r * .26, r * .18, r * .04); g.fill(); g.stroke(); g.restore();
+    mLimb(g, [[-r * .62, r * .3], [-r * 1.0, r * .12]], r * .14, mixC(c, INK, .15));
+    mClaw(g, -r * 1.0, r * .12, r * .16, 0);
+  },
+  // Queen of Noise: crowned, with hair made of sound waves and a speaker heart.
+  queen(g, r, c, o) {
+    const { tm, seed } = o;
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .4;
+    for (let i = 0; i < 5; i++) { g.strokeStyle = hexA(c, .85 - i * .1); g.lineWidth = Math.max(1, r * (.12 - i * .012)); g.beginPath();
+      for (let j = 0; j <= 14; j++) { const x = r * (.15 + j * .1), y = r * (-.55 + i * .2) + Math.sin(tm * 6 + j * .7 + i + seed) * r * .1 * (j / 14); j ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+    g.restore();
+    const gown = new Path2D(); gown.moveTo(-r * .7, r * 1.05); gown.quadraticCurveTo(-r * .55, r * .45, 0, r * .45); gown.quadraticCurveTo(r * .55, r * .45, r * .75, r * 1.05); gown.closePath();
+    mBody(g, gown, '#7a2a8a', r, o);
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .5; g.strokeStyle = c; g.lineWidth = Math.max(.8, r * .05);
+    for (const k of [1, .6, .25]) { g.beginPath(); g.arc(0, r * .78, r * .2 * k * (1 + o.beat * .25), 0, TAU); g.stroke(); } g.restore();
+    mBody(g, ell(0, -r * .05, r * .52, r * .62), '#f4c8ff', r, o);
+    mGloss(g, -r * .25, -r * .38, r * .14, r * .07, .6);
+    const cr = new Path2D(); cr.moveTo(-r * .5, -r * .5);
+    [[-.55, -1.05], [-.3, -.72], [-.15, -1.18], [0, -.78], [.15, -1.18], [.3, -.72], [.55, -1.05], [.5, -.5]].forEach(([x, y]) => cr.lineTo(x * r, y * r)); cr.closePath();
+    mBody(g, cr, '#ffd166', r, { ...o, glow: r * .4 });
+    g.fillStyle = c; for (const x of [-.55, -.15, .15, .55]) { g.beginPath(); g.arc(x * r, (Math.abs(x) > .4 ? -1.02 : -1.12) * r, r * .06, 0, TAU); g.fill(); }
+    mEye(g, -r * .22, -r * .1, r * .14, { sclera: '#1a0820', pupil: c, pupilSize: .7, glow: c, tall: .7, brow: 1, blink: o.blink });
+    mEye(g, r * .16, -r * .1, r * .13, { sclera: '#1a0820', pupil: c, pupilSize: .7, glow: c, tall: .7, brow: -1, blink: o.blink });
+    mMouth(g, -r * .04, r * .22, r * .2, r * (.07 + o.beat * .06), { teeth: 2, fangs: true, smile: .15 });
+    g.strokeStyle = c; g.lineWidth = Math.max(.8, r * .04); for (const x of [-.36, .3]) { g.beginPath(); g.moveTo(x * r, r * .05); g.lineTo(x * r + r * .05, r * .14); g.stroke(); }
+  },
+  // The Reverser: an hourglass with a face at each end; it flips your playhead.
+  reverser(g, r, c, o) {
+    const { tm, seed } = o;
+    g.rotate(Math.sin(tm * 1.1 + seed) * .22);
+    const wood = '#6b3d1f';
+    for (const sx of [-1, 1]) mLimb(g, [[sx * r * .82, -r * .95], [sx * r * .82, r * .95]], r * .1, wood);
+    const top = new Path2D(); top.moveTo(-r * .7, -r * .92); top.lineTo(r * .7, -r * .92); top.bezierCurveTo(r * .75, -r * .3, r * .1, -r * .15, r * .07, 0);
+    top.lineTo(-r * .07, 0); top.bezierCurveTo(-r * .1, -r * .15, -r * .75, -r * .3, -r * .7, -r * .92); top.closePath();
+    const bot = new Path2D(); bot.moveTo(-r * .7, r * .92); bot.lineTo(r * .7, r * .92); bot.bezierCurveTo(r * .75, r * .3, r * .1, r * .15, r * .07, 0);
+    bot.lineTo(-r * .07, 0); bot.bezierCurveTo(-r * .1, r * .15, -r * .75, r * .3, -r * .7, r * .92); bot.closePath();
+    mBody(g, top, c, r, o); mBody(g, bot, c, r, o, -.35, .3);
+    const sand = (tm * .25 + seed) % 1;
+    g.save(); g.clip(bot); g.fillStyle = '#fff1c4'; g.beginPath(); g.moveTo(-r * .8, r * .95); g.lineTo(r * .8, r * .95); g.lineTo(0, r * (.95 - .55 * sand)); g.fill(); g.restore();
+    g.fillStyle = '#fff1c4'; for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(0, ((tm * 3 + i * .25) % 1) * r * .5, r * .03, 0, TAU); g.fill(); }
+    for (const sy of [-1, 1]) { const p = new Path2D(); p.roundRect(-r * .98, sy > 0 ? r * .88 : -r * 1.08, r * 1.96, r * .2, r * .06); mBody(g, p, wood, r, { ...o, glow: 0 });
+      for (const sx of [-.9, .9]) { g.fillStyle = '#e9e4ff'; g.beginPath(); g.moveTo(sx * r - r * .07, sy * r * .98); g.lineTo(sx * r, sy * r * 1.3); g.lineTo(sx * r + r * .07, sy * r * .98); g.fill(); } }
+    const face = () => {
+      mEye(g, -r * .24, -r * .6, r * .12, { sclera: '#fff2a8', glow: '#ffb000', brow: 1, blink: o.blink });
+      mEye(g, r * .16, -r * .6, r * .11, { sclera: '#fff2a8', glow: '#ffb000', brow: -1, blink: o.blink });
+      mMouth(g, -r * .04, -r * .38, r * .22, r * (.07 + o.beat * .05), { teeth: 4, fangs: true });
+    };
+    face(); g.save(); g.rotate(Math.PI); face(); g.restore();
+  },
+  // Warden of Silence: a giant lidded eye on tentacles that seals your rows.
+  warden(g, r, c, o) {
+    const { tm, seed } = o, flesh = '#5b2a7a';
+    for (let i = 0; i < 5; i++) { const bx = r * (-.5 + i * .25), pts = [];
+      for (let j = 0; j <= 7; j++) pts.push([bx + Math.sin(tm * 3 + j * .7 + i * 1.3 + seed) * r * .12 * j / 7 + j * r * .05, r * (.5 + j * .13)]);
+      for (let j = 1; j < pts.length; j++) mLimb(g, [pts[j - 1], pts[j]], r * (.16 - j * .017), flesh); }
+    for (let i = 0; i < 9; i++) { const a = -Math.PI + i * Math.PI / 8; const p = new Path2D();
+      p.moveTo(Math.cos(a - .12) * r * .9, Math.sin(a - .12) * r * .9); p.lineTo(Math.cos(a) * r * 1.2, Math.sin(a) * r * 1.2); p.lineTo(Math.cos(a + .12) * r * .9, Math.sin(a + .12) * r * .9);
+      mBody(g, p, c, r, { ...o, glow: 0 }); }
+    mBody(g, circ(0, 0, r * .95), flesh, r, o);
+    const blink = Math.max(o.blink, ((tm + seed) % 5.5) < .3 ? Math.sin(((tm + seed) % 5.5) / .3 * Math.PI) : 0);
+    const oy = r * .55 * (1 - blink * .95);
+    const al = new Path2D(); al.moveTo(-r * .85, 0); al.quadraticCurveTo(0, -oy * 1.6, r * .85, 0); al.quadraticCurveTo(0, oy * 1.6, -r * .85, 0); al.closePath();
+    g.save(); g.clip(al);
+    const sg = g.createRadialGradient(-r * .1, -r * .1, r * .1, 0, 0, r * .9); sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#c9b8e6'); g.fillStyle = sg; g.fillRect(-r, -r, r * 2, r * 2);
+    g.strokeStyle = 'rgba(220,40,80,.6)'; g.lineWidth = Math.max(.6, r * .025);
+    for (let i = 0; i < 7; i++) { const a = i * TAU / 7 + .3; g.beginPath(); g.moveTo(Math.cos(a) * r * .85, Math.sin(a) * r * .5); g.quadraticCurveTo(Math.cos(a + .3) * r * .6, Math.sin(a + .3) * r * .35, Math.cos(a) * r * .42, Math.sin(a) * r * .3); g.stroke(); }
+    const px = Math.sin(tm * .8 + seed) * r * .15 - r * .12;
+    const ig = g.createRadialGradient(px, 0, r * .05, px, 0, r * .4); ig.addColorStop(0, '#ffffff'); ig.addColorStop(.35, c); ig.addColorStop(1, mixC(c, INK, .6));
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .5; g.fillStyle = ig; g.beginPath(); g.arc(px, 0, r * .4, 0, TAU); g.fill(); g.restore();
+    g.fillStyle = INK; g.beginPath(); g.ellipse(px, 0, r * .09, r * .3, 0, 0, TAU); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(px - r * .14, -r * .14, r * .07, 0, TAU); g.fill();
+    g.restore();
+    g.lineWidth = Math.max(1, r * .07); g.strokeStyle = INK; g.stroke(al);
+    g.strokeStyle = INK; g.lineWidth = Math.max(.8, r * .05);
+    for (let i = 0; i < 7; i++) { const t = (i + .5) / 7, x = -r * .85 + t * r * 1.7, y = -oy * 1.6 * 2 * t * (1 - t);
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (t - .5) * r * .3, y - r * .2); g.stroke(); }
+  },
+  // Brood Mother: a spider queen whose glowing egg sac keeps hatching minis.
+  brood(g, r, c, o) {
+    const { tm, seed } = o, legC = mixC(c, INK, .5);
+    for (const k of [-1, 1]) for (let i = 0; i < 4; i++) {
+      const st = Math.sin(tm * 7 + i * 1.6 + (k > 0 ? 1.5 : 0) + seed) * r * .1, bx = -r * .3 + i * r * .22;
+      mLimb(g, [[bx, k * r * .2], [bx + (i - 1.5) * r * .35, k * r * 1.0], [bx + (i - 1.5) * r * .62 + st, k * r * 1.18]], r * .1, legC);
+    }
+    const ab = ell(r * .42, 0, r * .68, r * .6); mBody(g, ab, c, r, o, .1, -.4);
+    g.save(); g.clip(ab); g.strokeStyle = mixC(c, INK, .55); g.lineWidth = Math.max(.8, r * .06);
+    for (const k of [.15, .45, .75]) { g.beginPath(); g.moveTo(r * k, -r * .6); g.quadraticCurveTo(r * (k + .15), 0, r * k, r * .6); g.stroke(); } g.restore();
+    for (const [ex, ey, er] of [[.35, -.2, .11], [.62, .08, .1], [.38, .22, .09], [.75, -.22, .08], [.15, .02, .08]]) {
+      const pulse = .7 + .3 * Math.sin(tm * 4 + ex * 10 + seed);
+      g.save(); g.shadowColor = '#fff6a0'; g.shadowBlur = r * .5 * pulse; g.fillStyle = `rgba(255,246,160,${pulse})`; g.beginPath(); g.arc(ex * r, ey * r, er * r, 0, TAU); g.fill(); g.restore(); }
+    mBody(g, ell(-r * .42, 0, r * .42, r * .38), c, r, o);
+    for (const sg of [-1, 1]) { g.fillStyle = '#fff6e6'; g.strokeStyle = INK; g.lineWidth = Math.max(.6, r * .03); g.beginPath();
+      g.moveTo(-r * .72, sg * r * .08); g.quadraticCurveTo(-r * 1.0, sg * r * .12, -r * .95, sg * r * .32); g.quadraticCurveTo(-r * .85, sg * r * .18, -r * .68, sg * r * .2); g.fill(); g.stroke(); }
+    for (const [ex, ey, es] of [[-.55, -.12, .1], [-.32, -.14, .09], [-.62, .08, .06], [-.42, .06, .06], [-.25, .08, .05], [-.48, -.28, .05]])
+      mEye(g, ex * r, ey * r, es * r, { sclera: '#ff6b6b', glow: '#ff2a2a', pupil: '#3a0008', pupilSize: .6, blink: o.blink });
+  },
+  // Phantom: a masked wraith that vanishes to another lane as it weakens.
+  phantom(g, r, c, o) {
+    const { tm, seed } = o;
+    g.globalAlpha *= .82 + .18 * Math.sin(tm * 5 + seed);
+    g.save(); g.fillStyle = hexA(c, .6); g.shadowColor = c; g.shadowBlur = r * .4;
+    for (let i = 0; i < 5; i++) { const t = (tm * .8 + i * .2 + seed) % 1; g.globalAlpha *= 1; g.beginPath(); g.arc(r * (.7 + t * 1.0), r * (.6 - i * .25) + Math.sin(tm * 3 + i) * r * .08, r * .06 * (1 - t), 0, TAU); g.fill(); }
+    g.restore();
+    const p = new Path2D(); p.moveTo(-r * .1, -r * 1.05); p.quadraticCurveTo(r * .7, -r * 1.0, r * .75, -r * .2); p.quadraticCurveTo(r * .9, r * .5, r * 1.25, r * .95);
+    for (let k = 0; k < 5; k++) { const x = r * (1.0 - k * .45), y = r * (1.0 + (k % 2 ? -.25 : 0)) + Math.sin(tm * 6 + k + seed) * r * .08; p.lineTo(x, y); }
+    p.quadraticCurveTo(-r * .85, r * .2, -r * .7, -r * .4); p.quadraticCurveTo(-r * .55, -r * 1.0, -r * .1, -r * 1.05); p.closePath();
+    mBody(g, p, c, r, o);
+    g.fillStyle = INK; g.beginPath(); g.ellipse(-r * .15, -r * .32, r * .45, r * .5, 0, 0, TAU); g.fill();
+    const mask = ell(-r * .18, -r * .28, r * .32, r * .4); mBody(g, mask, '#f3eaff', r * .6, { ...o, glow: r * .3 });
+    g.save(); g.shadowColor = c; g.shadowBlur = r * .6; g.fillStyle = mixC(c, '#ffffff', .3);
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(-r * .18 + sx * r * .04, -r * .33); g.lineTo(-r * .18 + sx * r * .24, -r * .45); g.lineTo(-r * .18 + sx * r * .2, -r * .24); g.closePath(); g.fill(); } g.restore();
+    g.strokeStyle = '#5a4a7a'; g.lineWidth = Math.max(.6, r * .03); g.beginPath(); g.moveTo(-r * .05, -r * .66); g.lineTo(-r * .1, -r * .5); g.lineTo(-r * .02, -r * .42); g.stroke();
+    g.beginPath(); g.moveTo(-r * .3, -r * .05); g.quadraticCurveTo(-r * .18, -r * (.12 + o.beat * .05), -r * .06, -r * .05); g.stroke();
+    mLimb(g, [[-r * .45, r * .25], [-r * .85, r * .35]], r * .16, mixC(c, INK, .2));
+    for (const k of [-.3, -.1, .1, .3]) { g.strokeStyle = INK; g.lineWidth = r * .09; g.beginPath(); g.moveTo(-r * .85, r * .35); g.lineTo(-r * 1.15, r * (.35 + k * .6)); g.stroke();
+      g.strokeStyle = '#f3eaff'; g.lineWidth = r * .045; g.stroke(); }
+  },
+};
+const FLYERS = new Set(['dash', 'mirror', 'stealth', 'healer', 'phantom']);
+function drawEnemy(g, type, x, y, r, o = {}) {
+  const c = enemyColor(type), tm = o.t ?? performance.now() / 1000, seed = o.seed || 0;
+  g.save();
+  if (o.hidden) { // only a pair of eyes shows in the dark
+    g.translate(x, y); g.globalAlpha *= .55 + .3 * Math.sin(tm * 3 + seed);
+    g.strokeStyle = hexA(c, .35); g.setLineDash([2, 3]); g.lineWidth = 1; g.beginPath(); g.arc(0, 0, r * .9, 0, TAU); g.stroke(); g.setLineDash([]);
+    const b = blinkOf(tm, seed, 2.4);
+    for (const ex of [-.3, .1]) { g.save(); g.shadowColor = '#fff3a0'; g.shadowBlur = r * .6; g.fillStyle = '#fff3a0';
+      g.beginPath(); g.ellipse(ex * r, -r * .1, r * .11, r * .07 * (1 - b), ex < 0 ? .3 : -.3, 0, TAU); g.fill(); g.restore(); }
+    g.restore(); return;
+  }
+  const fly = FLYERS.has(type);
+  const bob = o.still ? 0 : fly ? Math.sin(tm * 3 + seed) * r * .1 : Math.sin(tm * 4.5 + seed) * r * .03;
+  if (!o.noShadow) { g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(x, y + r * .98, r * (fly ? .4 : .7), r * .12, 0, 0, TAU); g.fill(); }
+  g.translate(x, y + bob); g.lineJoin = 'round'; g.lineCap = 'round';
+  (MONSTERS[type] || MONSTERS.dot)(g, r, c, { tm, seed, beat: o.beat || 0, flash: o.flash, immune: o.immune, glow: o.glow, blink: o.still ? 0 : blinkOf(tm, seed) });
   g.restore();
 }
 // Small pictures of enemies for the legend and the codex.
 const enemyIconCache = {};
 function enemyIcon(type) {
   if (enemyIconCache[type]) return enemyIconCache[type];
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const g = c.getContext('2d'); drawEnemy(g, type, 32, 34, 20, { still: true, t: 0, glow: 8 });
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"); drawEnemy(g, type, 64, 66, 34, { still: true, t: .4, glow: 12, noShadow: true });
   return enemyIconCache[type] = c.toDataURL();
 }
 // Synthwave backdrop: grid lines rush from the far right toward the speaker, faster while the music plays.
@@ -1546,10 +1843,10 @@ function drawField(dt) {
   cx.globalAlpha = 1;
   // enemies
   for (const e of G.enemies) {
-    const x = xPix(e.x), y = laneY(e.lane), r = Math.min(CH / LANES * (ENEMIES[e.type].boss ? .34 : .4), e.r * 1.45);
+    const x = xPix(e.x), y = laneY(e.lane), r = Math.min(CH / LANES * (ENEMIES[e.type].boss ? .46 : .37), e.r * 1.9);
     const boss = ENEMIES[e.type].boss;
     if (e.seed == null) e.seed = Math.random() * 10;
-    drawEnemy(cx, e.type, x, y, r, { flash: e.flash > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, seed: e.seed,
+    drawEnemy(cx, e.type, x, y, r, { flash: e.flash > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, seed: e.seed, beat: G.pulse || 0,
       immune: e.type === 'shield' && G.step % 2 === 1, glow: boss ? r * (1 + (G.pulse || 0) * .8) : r * .9 });
     if (e.slow > 0) { cx.strokeStyle = C.bass; cx.lineWidth = 1.5; cx.setLineDash([2, 3]); cx.beginPath(); cx.arc(x, y, r + 4, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); }
     if (e.max > 3 && !(ENEMIES[e.type].stealth && !e.revealed)) { // hp bar
@@ -2475,7 +2772,7 @@ G = newGame();
 fillSelects();
 renderAll();
 showStart();
-window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode, spawn };
+window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode, spawn, drawEnemy };
 requestAnimationFrame(frame);
 })();
 </script>

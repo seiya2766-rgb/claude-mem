@@ -47,7 +47,7 @@ const CAPSULES = [
     G.board = BOARD.map((row, l) => row.map((id, s) => id ? { id, uid: 1e6 + l * 8 + s, p: null, lv: (l + s) % 5 === 0 ? 2 : 1 } : null));
     G.hand = ['tom', 'arp', 'snare'].map((id, i) => ({ id, uid: 2e6 + i, p: null, lv: 1 }));
     G.relics = { sidechain: true, chorus: true };
-    if (extra === 'boss') { document.getElementById('overlay').hidden = true; W.enterNode(8, 'boss'); G.plan = [{ t: .5, type: 'phantom', lane: 1 }, { t: 2, type: 'dot', lane: 0 }, { t: 3, type: 'shield', lane: 2 }]; }
+    if (extra === 'boss') { document.getElementById('overlay').hidden = true; W.enterNode(8, 'boss'); G.plan = [{ t: .1, type: 'phantom', lane: 1 }, { t: .5, type: 'dot', lane: 0 }, { t: .9, type: 'shield', lane: 2 }, { t: 1.3, type: 'block', lane: 3 }, { t: 1.8, type: 'dash', lane: 0 }, { t: 2.2, type: 'hopper', lane: 3 }, { t: 2.6, type: 'healer', lane: 2 }]; }
     else { document.getElementById('overlay').hidden = true; W.enterNode(5, 'elite'); }
     W.startStage();
   }, { BOARD, extra });
@@ -66,9 +66,12 @@ const CAPSULES = [
   await shot(page, 'screenshot_2_battle.png');
 
   await stage(page, 'boss');
-  await page.waitForTimeout(900);
+  // For the boss shot keep the monsters on screen (they would be beaten before the picture is taken).
+  await page.evaluate(() => { window.__keep = setInterval(() => { const G = window.__g.G; G.groove = 0; for (const e of G.enemies) { e.hp = Math.max(e.hp, e.max * .7); e.x = Math.max(e.x, .45); } }, 50); });
+  await page.waitForTimeout(3600);
   await shot(page, 'screenshot_3_boss.png');
 
+  await page.evaluate(() => clearInterval(window.__keep));
   await page.evaluate(() => { const W = window.__g; W.G.phase = 'play'; W.G.enemies = []; W.G.spawnIdx = W.G.spawns.length; W.G.node = 'battle'; W.update(0.05); });
   await page.waitForTimeout(300);
   const offer = await page.$('#offers [data-id]'); if (offer) await offer.click();
