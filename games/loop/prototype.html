@@ -1791,32 +1791,134 @@ function enemyIcon(type) {
 }
 // Synthwave backdrop: grid lines rush from the far right toward the speaker, faster while the music plays.
 let gridT = 0;
-// The still parts (tint, lane stripes, lane lines) are drawn once per canvas size and reused every frame.
-let backdropCache = null;
-function buildBackdrop() {
+// ---- battlefield backdrop: a neon city at dusk ----
+// Layers, back to front: sky and striped sun, far skyline, near skyline with neon signs, lane stripes and lines.
+// Everything that does not move is painted once per canvas size into offscreen canvases; each frame only
+// blits them (the skylines scroll left at different speeds for depth) and adds a few blinking roof lights.
+// The city uses its own seeded random numbers, so it never touches the run's RNG.
+function cityRand(seed) {
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const CITY_NEON = ['#36d6ff', '#ff5fa2', '#c26dff', '#ffa44d', '#2cf2b4'];
+const CITY_SIGNS = ['カラオケ', 'ライブ', 'ビート', 'レコード', '音楽', '深夜'];
+const CITY_ROOF_SIGNS = ['LOOP', 'DJ', 'BPM', '24H', 'OPEN', '♪'];
+function newLayerCanvas() {
   const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
-  const g = c.getContext('2d'); g.setTransform(cx.getTransform());
+  const g = c.getContext('2d'); g.setTransform(cx.getTransform()); return { c, g };
+}
+function buildSky() {
+  const { c, g } = newLayerCanvas();
+  const sky = g.createLinearGradient(0, 0, 0, CH);
+  sky.addColorStop(0, '#06030d'); sky.addColorStop(.55, '#170a2e'); sky.addColorStop(1, '#3a0f4a');
+  g.fillStyle = sky; g.fillRect(0, 0, CW, CH);
+  // stars
+  const R = cityRand(11);
+  for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(255,255,255,${.15 + R() * .35})`; g.fillRect(R() * CW, R() * CH * .5, R() < .15 ? 1.6 : 1, R() < .15 ? 1.6 : 1); }
+  // striped sun low over the far end of the lanes, where the monsters come from
+  const sx = BASE_X + (CW - BASE_X) * .74, sy = CH * .5, sr = CH * .34;
+  const halo = g.createRadialGradient(sx, sy, sr * .6, sx, sy, sr * 2.2);
+  halo.addColorStop(0, 'rgba(255,90,160,.32)'); halo.addColorStop(1, 'rgba(255,90,160,0)');
+  g.fillStyle = halo; g.fillRect(0, 0, CW, CH);
+  const sun = document.createElement('canvas'); sun.width = c.width; sun.height = c.height;
+  const sg = sun.getContext('2d'); sg.setTransform(cx.getTransform());
+  const sf = sg.createLinearGradient(0, sy - sr, 0, sy + sr); sf.addColorStop(0, '#ffe08a'); sf.addColorStop(.5, '#ff8a5c'); sf.addColorStop(1, '#ff3d9a');
+  sg.fillStyle = sf; sg.beginPath(); sg.arc(sx, sy, sr, 0, Math.PI * 2); sg.fill();
+  sg.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 7; i++) { const y = sy + sr * (.05 + i * .14), h = sr * (.025 + i * .016); sg.fillRect(sx - sr, y, sr * 2, h); }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = .55; g.drawImage(sun, 0, 0); g.restore();
+  // horizon haze
+  const hz = g.createLinearGradient(0, CH * .55, 0, CH); hz.addColorStop(0, 'rgba(255,61,154,0)'); hz.addColorStop(1, 'rgba(255,61,154,.16)');
+  g.fillStyle = hz; g.fillRect(0, CH * .55, CW, CH * .45);
+  return c;
+}
+// One skyline that tiles horizontally: buildings crossing the right edge are also drawn shifted by -width.
+function buildSkyline(near) {
+  const { c, g } = newLayerCanvas();
+  const R = cityRand(near ? 7 : 3), W = CW, H = CH, lights = [], blds = [];
+  for (let x = R() * 10; x < W;) {
+    const w = near ? 30 + R() * 44 : 18 + R() * 28, h = H * (near ? .2 + R() * .26 : .3 + R() * .3);
+    const b = { x, w, h, top: R() < .35 ? { dx: w * (.15 + R() * .2), w: w * (.4 + R() * .2), h: H * (.04 + R() * .08) } : null,
+      ant: R() < (near ? .35 : .25) ? H * (.05 + R() * .1) : 0, neon: near && R() < .55 ? CITY_NEON[Math.floor(R() * CITY_NEON.length)] : null,
+      sign: near && R() < .3 ? { text: CITY_SIGNS[Math.floor(R() * CITY_SIGNS.length)], color: CITY_NEON[Math.floor(R() * CITY_NEON.length)], side: R() < .5 } : null,
+      roof: near && R() < .22 ? { text: CITY_ROOF_SIGNS[Math.floor(R() * CITY_ROOF_SIGNS.length)], color: CITY_NEON[Math.floor(R() * CITY_NEON.length)] } : null,
+      win: [] };
+    const cw = near ? 6 : 5, rh = near ? 7 : 6;
+    for (let wy = H - h + 6; wy < H - 4; wy += rh) for (let wx = x + 4; wx < x + w - 4; wx += cw)
+      if (R() < (near ? .3 : .22)) b.win.push([wx - x, wy, R() < .7 ? '#ffd89a' : R() < .5 ? '#36d6ff' : '#ff8fd0', .25 + R() * .45]);
+    blds.push(b); x += w + (near ? 4 + R() * 14 : R() * 5);
+  }
+  const body = near ? (() => { const gr = g.createLinearGradient(0, H * .4, 0, H); gr.addColorStop(0, '#1a0c33'); gr.addColorStop(1, '#0a0516'); return gr; })() : '#24124a';
+  const draw = (b, ox) => {
+    const x = b.x + ox, y = H - b.h;
+    g.fillStyle = body; g.fillRect(x, y, b.w, b.h);
+    if (b.top) g.fillRect(x + b.top.dx, y - b.top.h, b.top.w, b.top.h);
+    const roofY = b.top ? y - b.top.h : y, roofX = b.top ? x + b.top.dx + b.top.w / 2 : x + b.w / 2;
+    if (b.ant) { g.strokeStyle = body === '#24124a' ? '#24124a' : '#1a0c33'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(roofX, roofY); g.lineTo(roofX, roofY - b.ant); g.stroke();
+      if (ox === 0) lights.push([roofX, roofY - b.ant, R() * 2]); }
+    const sc = near ? 1 : .8;
+    for (const [wx, wy, col, a] of b.win) { g.globalAlpha = a * (near ? 1 : .7); g.fillStyle = col; g.fillRect(x + wx, wy, 2.2 * sc, 3 * sc); }
+    g.globalAlpha = 1;
+    if (b.neon) { g.save(); g.shadowColor = b.neon; g.shadowBlur = 8; g.strokeStyle = b.neon; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(x, y + b.h * .5); g.lineTo(x, y); g.lineTo(x + b.w, y); g.lineTo(x + b.w, y + b.h * .5); g.stroke(); g.restore(); }
+    if (b.sign) { const sw = 12, chars = [...b.sign.text], sh = chars.length * 11 + 6, sx2 = b.sign.side ? x - sw / 2 : x + b.w - sw / 2, sy2 = y + 8;
+      g.save(); g.fillStyle = '#12081f'; g.fillRect(sx2, sy2, sw, sh); g.shadowColor = b.sign.color; g.shadowBlur = 8; g.strokeStyle = b.sign.color; g.lineWidth = 1.2; g.strokeRect(sx2, sy2, sw, sh);
+      g.fillStyle = mixC(b.sign.color, '#ffffff', .45); g.font = '700 9px ' + css('f-body'); g.textAlign = 'center'; g.textBaseline = 'middle';
+      chars.forEach((ch, i) => g.fillText(ch, sx2 + sw / 2, sy2 + 8.5 + i * 11)); g.restore(); }
+    if (b.roof) { g.save(); g.font = '700 11px "IBM Plex Mono", monospace'; const tw = g.measureText(b.roof.text).width + 8, rx = roofX - tw / 2, ry = roofY - 15;
+      g.strokeStyle = '#1a0c33'; g.lineWidth = 1; g.beginPath(); g.moveTo(rx + 3, ry + 13); g.lineTo(rx + 3, roofY); g.moveTo(rx + tw - 3, ry + 13); g.lineTo(rx + tw - 3, roofY); g.stroke();
+      g.shadowColor = b.roof.color; g.shadowBlur = 10; g.fillStyle = mixC(b.roof.color, '#ffffff', .35); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(b.roof.text, roofX, ry + 6); g.restore(); }
+  };
+  for (const b of blds) { draw(b, 0); if (b.x + b.w + 40 > W) draw(b, -W); }
+  return { c, lights };
+}
+function buildLanes() {
+  const { c, g } = newLayerCanvas();
   const lh = CH / LANES, x0 = BASE_X, x1 = CW - QUEUE_W - 4;
+  g.fillStyle = 'rgba(7,4,15,.22)'; g.fillRect(0, 0, CW, CH); // keeps monsters readable over the city
   const gr = g.createLinearGradient(x0, 0, x1, 0);
-  gr.addColorStop(0, 'rgba(54,214,255,.10)'); gr.addColorStop(.5, 'rgba(194,109,255,.05)'); gr.addColorStop(1, 'rgba(255,61,154,.10)');
+  gr.addColorStop(0, 'rgba(54,214,255,.08)'); gr.addColorStop(.5, 'rgba(194,109,255,.03)'); gr.addColorStop(1, 'rgba(255,61,154,.06)');
   g.fillStyle = gr; g.fillRect(0, 0, CW, CH);
-  for (let l = 0; l < LANES; l++) if (l % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.025)'; g.fillRect(0, l * lh, CW, lh); }
-  const lg = g.createLinearGradient(x0, 0, x1, 0); lg.addColorStop(0, 'rgba(54,214,255,.45)'); lg.addColorStop(1, 'rgba(255,61,154,.25)');
+  for (let l = 0; l < LANES; l++) if (l % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.03)'; g.fillRect(0, l * lh, CW, lh); }
+  const lg = g.createLinearGradient(x0, 0, x1, 0); lg.addColorStop(0, 'rgba(54,214,255,.5)'); lg.addColorStop(1, 'rgba(255,61,154,.3)');
   g.strokeStyle = lg; g.lineWidth = 1;
   for (let l = 1; l < LANES; l++) { const y = Math.round(l * lh) + .5; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
-  return { c, key: cv.width + 'x' + cv.height };
+  return c;
+}
+let backdropCache = null, cityT = 0;
+function buildBackdrop() {
+  return { key: cv.width + 'x' + cv.height, sky: buildSky(), far: buildSkyline(false), near: buildSkyline(true), lanes: buildLanes() };
+}
+function blitScroll(img, offset, alpha = 1) {
+  const k = cv.width / CW, off = (((offset % CW) + CW) % CW) * k;
+  cx.globalAlpha = alpha; cx.drawImage(img, -off, 0); cx.drawImage(img, cv.width - off, 0); cx.globalAlpha = 1;
 }
 function drawBackdrop(C, dt) {
   const x0 = BASE_X, x1 = CW - QUEUE_W - 4, span = x1 - x0;
   if (!backdropCache || backdropCache.key !== cv.width + 'x' + cv.height) backdropCache = buildBackdrop();
-  cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(backdropCache.c, 0, 0); cx.restore();
-  const playing = G.phase === 'play' || G.listening || G.studio && G.listening;
-  gridT = (gridT + dt * (playing ? .55 * (G.speed || 1) * (G.fever > 0 ? 1.8 : 1) : .08)) % 1;
+  const B = backdropCache, playing = G.phase === 'play' || G.listening;
+  const pace = (G.speed || 1) * (G.fever > 0 ? 1.8 : 1);
+  cityT += dt * (playing ? pace : .2);
+  cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0);
+  cx.drawImage(B.sky, 0, 0);
+  blitScroll(B.far.c, cityT * 6, .75);
+  blitScroll(B.near.c, cityT * 15, .82 + (G.pulse || 0) * .18);
+  cx.restore();
+  // blinking red lights on the antennas of the near skyline
+  const tm = performance.now() / 1000, noff = ((cityT * 15) % CW + CW) % CW;
+  cx.fillStyle = '#ff4d5e';
+  for (const [lx, ly, ph] of B.near.lights) if ((tm * .9 + ph) % 2 < .5) {
+    let x = lx - noff; if (x < 0) x += CW;
+    cx.globalAlpha = .9; cx.beginPath(); cx.arc(x, ly, 1.8, 0, Math.PI * 2); cx.fill();
+    cx.globalAlpha = .25; cx.beginPath(); cx.arc(x, ly, 5, 0, Math.PI * 2); cx.fill();
+  }
+  cx.globalAlpha = 1;
+  cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(B.lanes, 0, 0); cx.restore();
+  gridT = (gridT + dt * (playing ? .55 * pace : .08)) % 1;
   const N = 14;
   cx.lineWidth = 1;
   for (let i = 0; i < N; i++) {
     const u = ((i + 1 - gridT) / N), x = x0 + span * Math.pow(u, 1.7);
-    const a = .05 + .22 * (1 - u);
+    const a = .04 + .16 * (1 - u);
     cx.strokeStyle = `rgba(194,109,255,${a})`; cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, CH); cx.stroke();
   }
 }
@@ -1921,8 +2023,12 @@ function drawField(dt) {
     cx.globalAlpha = 1; banner.life -= dt; if (banner.life <= 0) banner = null;
   }
   if ((G.phase === 'build' || G.studio) && !G.listening) {
-    cx.fillStyle = C.muted; cx.font = '500 13px ' + css('f-body'); cx.textAlign = 'center';
-    cx.fillText(G.studio ? t('studio.field') : t('f.idle', { node: nodeLabel() }), (CW - QUEUE_W) / 2 + 10, CH / 2);
+    const msg = G.studio ? t('studio.field') : t('f.idle', { node: nodeLabel() }), mx = (CW - QUEUE_W) / 2 + 10;
+    cx.font = '600 14px ' + css('f-body'); cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    const mw = cx.measureText(msg).width + 36;
+    cx.fillStyle = 'rgba(7,4,15,.78)'; cx.beginPath(); cx.roundRect(mx - mw / 2, CH / 2 - 17, mw, 34, 17); cx.fill();
+    cx.strokeStyle = 'rgba(194,109,255,.45)'; cx.lineWidth = 1; cx.stroke();
+    cx.fillStyle = C.fg; cx.fillText(msg, mx, CH / 2 + 1);
   }
 }
 
