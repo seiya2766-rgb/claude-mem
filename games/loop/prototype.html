@@ -458,6 +458,11 @@ body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent);
 .arena.danger:not(.fever) { animation: dangerFrame .9s ease-in-out infinite; }
 @keyframes dangerFrame { 50% { box-shadow: 0 0 0 1.5px var(--noise), 0 0 26px -6px var(--noise); } }
 @media (prefers-reduced-motion: reduce) { .arena.fever, .arena.danger { animation: none; } }
+/* losing life: the screen edges flash red */
+#hurtFx { position: fixed; inset: 0; pointer-events: none; z-index: 30; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 40, 80, .55) 100%); }
+#hurtFx.on { animation: hurtFx .5s ease-out; }
+@keyframes hurtFx { 0% { opacity: 1; } 100% { opacity: 0; } }
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -567,6 +572,7 @@ body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent);
   <p class="hero-tag" data-i18n="title.tag"></p>
   <p class="hero-sub" data-i18n="title.sub"></p>
 </div>
+<div id="hurtFx" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
@@ -790,7 +796,8 @@ function newGame(kit = 'rhythm', rank = 0) {
 function freshStage() {
   return { t: 0, acc: 0, step: -1, stepCount: 0, loop: 0, noise: 0, overheat: 0,
            enemies: [], spawns: [], spawnIdx: 0, delayed: [], fx: [], texts: [],
-           muted: -1, mutedLeft: 0, mutedRow: -1, mutedRowLeft: 0, hits: [], tempo: tempoMax(), dir: 1, groove: 0, fever: 0, stepHits: 0 };
+           muted: -1, mutedLeft: 0, mutedRow: -1, mutedRowLeft: 0, hits: [], tempo: tempoMax(), dir: 1, groove: 0, fever: 0, stepHits: 0,
+           combo: 0, lastKill: -9, finale: 0, chain: [], shake: 0 };
 }
 const noiseMax = () => (G.relics.gate ? 42 : 30) + (G.kit === 'noise' ? 14 : 0) - (G.rank >= 8 ? 6 : 0);
 const price = id => PRICES[id] + (G.rank >= 6 ? 2 : 0);
@@ -1275,12 +1282,43 @@ function damage(e, amount, color, src) {
   if (d >= 40) unlock('big_hit');
   G.fx.push({ kind: 'beam', lane: e.lane, x: e.x, color, life: .16, max: .16 });
   G.texts.push({ lane: e.lane, x: e.x, txt: String(d), life: d >= 15 ? .9 : .6, big: d >= 15 });
+  if (d >= 15) G.shake = Math.max(G.shake || 0, Math.min(8, 2 + d / 8));
   if (e.hp <= 0) {
-    G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', ecolor: enemyColor(e.type), life: .3, max: .3, r: e.r });
-    for (let k = 0; k < 7; k++) { const a = Math.random() * Math.PI * 2, v = 30 + Math.random() * 50;
-      G.fx.push({ kind: 'bit', lane: e.lane, x: e.x, dx: Math.cos(a) * v, dy: Math.sin(a) * v, color, life: .45, max: .45 }); }
+    burst(e);
+    // kills in quick succession climb the scale and count as a combo
+    G.combo = G.t - G.lastKill < 1 ? G.combo + 1 : 1; G.lastKill = G.t;
+    killSound(ENEMIES[e.type].boss);
+    if (G.combo >= 3) G.comboShow = { n: G.combo, life: 1.2 };
     if (e.type === 'split') { spawn('mini', e.lane, Math.min(1, e.x + .03)); spawn('mini', e.lane, Math.min(1, e.x + .08)); }
+    if (ENEMIES[e.type].boss) bossDown(e);
   }
+}
+// ---- game feel: bursts, kill sounds, boss finale ----
+function burst(e, big) {
+  const boss = ENEMIES[e.type].boss, hex = enemyColor(e.type), n = boss || big ? 34 : 12;
+  G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', ecolor: hex, life: boss ? .7 : .35, max: boss ? .7 : .35, r: e.r * (boss ? 3 : 1.4) });
+  if (boss) G.fx.push({ kind: 'pop', lane: e.lane, x: e.x, color: 'enemy', ecolor: '#ffffff', life: .45, max: .45, r: e.r * 1.6 });
+  for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, v = (boss ? 60 : 35) + Math.random() * (boss ? 160 : 70);
+    G.fx.push({ kind: 'bit', lane: e.lane, x: e.x, dx: Math.cos(a) * v, dy: Math.sin(a) * v, hex: k % 4 ? hex : '#ffffff', size: boss ? 5 : 4, life: boss ? .9 : .5, max: boss ? .9 : .5 }); }
+}
+// The boss falls: flash, shake, a banner, and every other enemy on the field pops in a chain.
+function bossDown(e) {
+  G.finale = 1.5; G.shake = 10; G.flash = 1;
+  showBanner(t('bn.defeat'), ENEMIES[e.type].name, 'lead', 1.5);
+  G.spawnIdx = G.spawns.length;
+  G.enemies.filter(o => o !== e && o.hp > 0).sort((a, b) => a.x - b.x).forEach((o, i) => G.chain.push({ at: G.t + .15 + i * .09, e: o }));
+}
+// A short pluck in the current key; each kill in a combo sounds one step higher.
+let lastKillSnd = 0;
+function killSound(boss) {
+  if (!ac) return;
+  const now = ac.currentTime; if (!boss && now - lastKillSnd < .05) return; lastKillSnd = now;
+  bus = sfxBus;
+  try {
+    const t0 = now + .01, f = mtof(degToMidi(76, Math.min(12, G.combo - 1)));
+    osc('triangle', f, t0, .06, .2, .002); osc('sine', f * 2, t0, .025, .12, .002); noiseHit(t0, 'highpass', 7000, .03, .03);
+    if (boss) { [0, 2, 4, 7, 9].forEach((dg, k) => osc('square', mtof(degToMidi(67, dg)), t0 + k * .08, .045, .5, .003, 3200)); noiseHit(t0, 'lowpass', 900, .35, 1.1); }
+  } finally { bus = null; }
 }
 function makeCtx(lane, step, mul, color, src, lv = 1) {
   return {
@@ -1458,16 +1496,20 @@ function update(dt) {
     e.x -= sp * dt; e.slow = Math.max(0, e.slow - dt); e.flash = Math.max(0, e.flash - dt);
     if (e.x <= 0) {
       e.hp = 0; G.life -= e.dmg; sfx('hurt'); G.groove = Math.max(0, G.groove - 30);
-      G.fx.push({ kind: 'hurt', lane: e.lane, life: .4, max: .4 });
+      G.fx.push({ kind: 'hurt', lane: e.lane, life: .4, max: .4 }); G.combo = 0;
+      const hf = $('hurtFx'); hf.classList.remove('on'); void hf.offsetWidth; hf.classList.add('on');
       if (SET.shake) { cv.classList.remove('hurt'); void cv.offsetWidth; cv.classList.add('hurt'); }
       renderStatus();
     }
   }
+  for (const c of G.chain) if (G.t >= c.at && c.e.hp > 0) { c.e.hp = 0; G.stats.kills++; burst(c.e); }
+  G.chain = G.chain.filter(c => G.t < c.at);
   G.enemies = G.enemies.filter(e => e.hp > 0);
+  if (G.finale > 0) G.finale -= dt;
   G.acc += dt;
   while (G.acc >= STEP_DUR) { G.acc -= STEP_DUR; doStep(); if (G.phase !== 'play') return; }
   if (G.life <= 0) { gameOver(); return; }
-  if (G.spawnIdx >= G.spawns.length && G.enemies.length === 0) stageClear();
+  if (G.spawnIdx >= G.spawns.length && G.enemies.length === 0 && !(G.finale > 0)) stageClear();
 }
 
 // ================= rendering: field =================
@@ -1961,6 +2003,7 @@ function drawEnemy(g, type, x, y, r, o = {}) {
   const bob = o.still ? 0 : fly ? Math.sin(tm * 3 + seed) * r * .1 : Math.sin(tm * 4.5 + seed) * r * .03;
   if (!o.noShadow) { g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(x, y + r * .98, r * (fly ? .4 : .7), r * .12, 0, 0, TAU); g.fill(); }
   g.translate(x, y + bob); g.lineJoin = 'round'; g.lineCap = 'round';
+  if (o.hit > 0) { g.translate(r * .14 * o.hit, 0); g.scale(1 - .12 * o.hit, 1 + .1 * o.hit); } // knocked back and squashed by a hit
   (MONSTERS[type] || MONSTERS.dot)(g, r, c, { tm, seed, beat: o.beat || 0, flash: o.flash, immune: o.immune, glow: o.glow, blink: o.still ? 0 : blinkOf(tm, seed) });
   g.restore();
 }
@@ -2193,6 +2236,12 @@ function drawBackdrop(C, dt) {
 }
 var fieldColors = null; // cached CSS colours; cleared when the palette changes (applyCb)
 function drawField(dt) {
+  const sh = SET.shake ? (G.shake || 0) : 0;
+  if (sh > .2) { cx.save(); cx.translate((Math.random() - .5) * sh, (Math.random() - .5) * sh); }
+  try { drawFieldInner(dt); } finally { if (sh > .2) cx.restore(); }
+  G.shake = Math.max(0, (G.shake || 0) - dt * 28);
+}
+function drawFieldInner(dt) {
   if (!CW) sizeCanvas();
   const C = fieldColors || (fieldColors = { lead: css('lead'), bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
               drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') });
@@ -2225,7 +2274,7 @@ function drawField(dt) {
       cx.globalAlpha = a * .22; cx.lineWidth = 11; cx.stroke(); cx.globalAlpha = a * .45; cx.lineWidth = 5; cx.stroke();
       cx.globalAlpha = a; cx.lineWidth = 2.5; cx.stroke();
       cx.strokeStyle = '#ffffff'; cx.lineWidth = 1; cx.globalAlpha = a * .8; cx.stroke(); cx.restore(); }
-    if (f.kind === 'bit') { const tt = f.max - f.life; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = C[f.color] || C.enemy; const bx = xPix(f.x) + f.dx * tt, by = laneY(f.lane) + f.dy * tt;
+    if (f.kind === 'bit') { const tt = f.max - f.life; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = f.hex || C[f.color] || C.enemy; const bx = xPix(f.x) + f.dx * tt, by = laneY(f.lane) + f.dy * tt + 40 * tt * tt;
       cx.globalAlpha = a * .3; cx.fillRect(bx - 4, by - 4, 8, 8); cx.globalAlpha = a; cx.fillRect(bx - 2, by - 2, 4, 4); cx.restore(); }
     if (f.kind === 'pop') { cx.strokeStyle = f.ecolor || C.enemy; cx.globalAlpha = a; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(xPix(f.x), laneY(f.lane), f.r + (1 - a) * 14, 0, Math.PI * 2); cx.stroke(); }
     cx.globalAlpha = 1;
@@ -2255,7 +2304,7 @@ function drawField(dt) {
     const x = xPix(e.x), y = laneY(e.lane), r = Math.min(CH / LANES * (ENEMIES[e.type].boss ? .46 : .37), e.r * 2.6);
     const boss = ENEMIES[e.type].boss;
     if (e.seed == null) e.seed = Math.random() * 10;
-    drawEnemy(cx, e.type, x, y, r, { flash: e.flash > 0, hidden: ENEMIES[e.type].stealth && !e.revealed, seed: e.seed, beat: G.pulse || 0,
+    drawEnemy(cx, e.type, x, y, r, { flash: e.flash > 0, hit: Math.max(0, e.flash / .12), hidden: ENEMIES[e.type].stealth && !e.revealed, seed: e.seed, beat: G.pulse || 0,
       immune: e.type === 'shield' && G.step % 2 === 1, glow: boss ? r * (1 + (G.pulse || 0) * .8) : r * .9 });
     if (e.slow > 0) { cx.strokeStyle = C.bass; cx.lineWidth = 1.5; cx.setLineDash([2, 3]); cx.beginPath(); cx.arc(x, y, r + 4, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); }
     if (e.max > 3 && !(ENEMIES[e.type].stealth && !e.revealed)) { // hp bar
@@ -2268,13 +2317,22 @@ function drawField(dt) {
   for (const t of G.texts) {
     const a = Math.max(0, Math.min(1, t.life / .4));
     cx.globalAlpha = a; cx.fillStyle = t.warn ? C.noise : t.big ? C.lead : C.fg;
-    cx.font = t.warn ? '700 12px ' + css('f-body') : t.big ? '700 17px "IBM Plex Mono", monospace' : '600 11px "IBM Plex Mono", monospace';
+    const pop = t.big ? 1 + Math.max(0, t.life - .7) * 2.2 : 1; // big hits pop in, then settle
+    cx.font = t.warn ? '700 12px ' + css('f-body') : t.big ? `700 ${Math.round(17 * pop)}px "IBM Plex Mono", monospace` : '600 11px "IBM Plex Mono", monospace';
     const tx = Math.max(40, Math.min(CW - 40, xPix(t.x)));
     cx.fillText(t.txt, tx, Math.max(9, laneY(t.lane) - Math.max(14, CH / LANES * .5) - (1 - a) * 8));
     t.life -= dt;
   }
   cx.globalAlpha = 1;
   G.texts = G.texts.filter(t => t.life > 0);
+  // one combo counter near the speaker, replaced by every kill
+  if (G.comboShow && G.comboShow.life > 0) {
+    const c = G.comboShow, a = Math.min(1, c.life / .3), pop = 1 + Math.max(0, c.life - 1) * 2.5;
+    cx.save(); cx.globalAlpha = a; cx.textAlign = 'left'; cx.textBaseline = 'top';
+    cx.font = `800 ${Math.round(20 * pop)}px "IBM Plex Mono", monospace`; cx.fillStyle = '#ffd166'; cx.shadowColor = '#ffa44d'; cx.shadowBlur = 10;
+    const label = t('f.combo', { n: c.n }); cx.fillText(label, BASE_X + 16, 8); cx.restore();
+    c.life -= dt;
+  }
   if (G.flash > 0) { cx.fillStyle = C.lead; cx.globalAlpha = G.flash * .25; cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; G.flash = Math.max(0, G.flash - dt * 2.5); }
   if (banner) {
     const k = banner.max - banner.life, a = Math.min(1, k / .2, banner.life / .4), y = CH / 2;

@@ -283,6 +283,28 @@ async function drag(p, from, to) {
     await ctx.close();
   }
 
+  // v3.5 game feel: combo count and the boss finale
+  {
+    const { ctx, page: p } = await open(browser);
+    await p.click('#go'); await p.waitForTimeout(100);
+    const r = await p.evaluate(() => { const W = window.__g, G = W.G;
+      G.board = Array.from({ length: 4 }, () => Array(8).fill(null));
+      for (let s = 0; s < 8; s++) G.board[1][s] = { id: 'lead', uid: 7e6 + s, p: null, lv: 1 };
+      G.plan = [{ t: 99, type: 'dot', lane: 0 }]; W.startStage(); G.enemies = [];
+      for (let i = 0; i < 4; i++) W.spawn('dot', 1, .3 + i * .1); for (const e of G.enemies) { e.hp = e.max = 1; e.speed = 0; }
+      G.step = -1; W.doStep(); const combo = G.combo;
+      G.node = 'boss'; G.plan = [{ t: 99, type: 'dot', lane: 0 }]; W.startStage(); G.enemies = [];
+      W.spawn('queen', 1, .7); W.spawn('dot', 0, .6); W.spawn('block', 3, .5); for (const e of G.enemies) e.speed = 0; G.enemies[0].hp = 1;
+      G.step = -1; W.doStep(); const finale = G.finale > 0;
+      for (let k = 0; k < 10; k++) W.update(.05); const left = G.enemies.length;
+      for (let k = 0; k < 40 && G.phase === 'play'; k++) W.update(.05);
+      return { combo, finale, left, phase: G.phase }; });
+    check('kills in one beat count as a combo', r.combo === 4, r.combo);
+    check('defeating the boss clears the field after a finale', r.finale && r.left === 0 && r.phase !== 'play', JSON.stringify(r));
+    check('no page errors with the game-feel effects', p.errors.length === 0, p.errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
   const failed = results.filter(r => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

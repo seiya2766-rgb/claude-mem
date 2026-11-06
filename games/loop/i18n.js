@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'f.combo': '{n}連続撃破', 'bn.defeat': '撃破！',
     'ui.noiseShort': 'ノイズ', 'ui.noiseTip': 'たまりすぎると1小節止まる', 'ui.grooveTip': '満タンでフィーバー',
     'title.tag': 'あなたの曲が、あなたを守る。', 'title.sub': '音楽ローグライト・ディフェンス',
     'r.next': '次の場所', 'v.song': 'あなたの曲',
@@ -35,7 +36,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v3.4 — 戦闘画面の磨き込み',
+    'ui.proto': '試作版 v3.5 — 手応えの強化',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -224,6 +225,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'f.combo': '{n} combo', 'bn.defeat': 'DEFEATED!',
     'ui.noiseShort': 'Noise', 'ui.noiseTip': 'too much stops the music for a bar', 'ui.grooveTip': 'full means Fever',
     'title.tag': 'Your song is your defense.', 'title.sub': 'A MUSIC ROGUELITE DEFENSE',
     'r.next': 'Next stop', 'v.song': 'Your song',
@@ -256,7 +258,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v3.4 — Battle screen polish',
+    'ui.proto': 'PROTOTYPE v3.5 — Game feel',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -441,6 +443,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'f.combo': '{n}连续击破', 'bn.defeat': '击破！',
     'ui.noiseShort': '噪音', 'ui.noiseTip': '过高时会停奏1小节', 'ui.grooveTip': '满格进入狂热',
     'title.tag': '你的乐曲，就是你的防线。', 'title.sub': '音乐肉鸽塔防',
     'r.next': '下一站', 'v.song': '你的乐曲',
@@ -473,7 +476,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v3.4 — 战斗画面打磨',
+    'ui.proto': '原型 v3.5 — 手感强化',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',
