@@ -338,6 +338,61 @@ select { background: #1a1130; }
   .side { gap: 12px; }
   .side > * { flex-shrink: 0; }
 }
+/* ---- choice screens: cards with art, route strip, end-of-run summary ---- */
+.offers.one { grid-template-columns: minmax(0, 260px); justify-content: center; }
+.offers.shop { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.offer.choice { --c: var(--drum); align-items: center; text-align: center; gap: 5px; padding: 14px 10px 12px; border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 13%, var(--surface)), color-mix(in srgb, var(--surface) 92%, transparent) 70%);
+  border: 1.5px solid color-mix(in srgb, var(--c) 32%, var(--line)); transition: transform .12s, box-shadow .12s, border-color .12s; }
+.offer.choice:hover:not(:disabled), .offer.choice:focus-visible { transform: translateY(-3px); border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 10px 26px -10px var(--c); outline: none; }
+.offer.choice:disabled { opacity: .38; }
+.offer.choice.sold { --c: var(--muted); }
+.choice-art { height: 54px; display: grid; place-items: center; margin-bottom: 2px; }
+.choice-art .tile { width: 50px; height: 50px; }
+.choice .ico { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; color: #12081f;
+  background: radial-gradient(130% 130% at 28% 18%, color-mix(in srgb, var(--c) 45%, #fff) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 60%, #12081f) 100%);
+  box-shadow: 0 0 16px -3px var(--c), inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -2px 0 rgba(0, 0, 0, .22); }
+.choice .ico svg { width: 30px; height: 30px; }
+.choice .offer-name { font-size: 15px; }
+.choice .offer-desc { line-height: 1.5; }
+.choice .price { margin-top: auto; padding: 2px 10px; border-radius: 99px; background: rgba(255, 209, 102, .1); box-shadow: inset 0 0 0 1px rgba(255, 209, 102, .35); }
+.choice .kind { margin-top: auto; }
+.choice .kind + .price { margin-top: 0; }
+.purse { font-size: 13px; color: var(--muted); }
+/* where the next stage takes place, painted in that backdrop's sky */
+.place { display: flex; align-items: baseline; gap: 10px; padding: 9px 14px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 34%, transparent), transparent 60%), var(--sky); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 0 18px -8px var(--tc); }
+.place span { font-size: 11px; letter-spacing: .08em; color: rgba(255, 255, 255, .7); }
+.place b { font-size: 15px; color: #fff; text-shadow: 0 0 10px var(--tc); }
+.route { gap: 0; }
+.route em { width: 14px; height: 2px; background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.route i { width: 12px; height: 12px; border-color: var(--tc); }
+.route i.done { background: var(--tc); opacity: .5; }
+.route i.now { background: var(--tc); border-color: #fff; box-shadow: 0 0 10px var(--tc); transform: scale(1.25); }
+.route i.boss { border-radius: 3px; transform: rotate(45deg); }
+.route i.boss.now { transform: rotate(45deg) scale(1.25); }
+.route span { margin-left: 10px; }
+/* end of run */
+.hero-ico { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto -4px; border-radius: 20px; color: #12081f;
+  background: radial-gradient(130% 130% at 28% 18%, #fff 0%, var(--c) 40%, color-mix(in srgb, var(--c) 60%, #12081f) 100%); box-shadow: 0 0 30px -4px var(--c); }
+.hero-ico svg { width: 38px; height: 38px; }
+.hero-ico.win { --c: var(--gold); } .hero-ico.lose { --c: var(--noise); }
+.modal:has(.hero-ico) > h2 { text-align: center; }
+.modal:has(.hero-ico) > p { text-align: center; }
+.modal:has(.hero-ico) > .row { justify-content: center; }
+.end-summary { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
+.end-song { display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 1px var(--line); }
+.end-song b { font-size: 12px; letter-spacing: .08em; color: var(--muted); }
+.end-song small { font-size: 11px; color: var(--muted); }
+.mini-board { display: grid; grid-template-columns: repeat(8, 20px); gap: 3px; }
+.mini { width: 20px; height: 20px; display: grid; place-items: center; }
+.mini .tile { width: 20px; height: 20px; box-shadow: 0 0 6px -2px var(--c); }
+.mini.empty { border-radius: 5px; background: rgba(255, 255, 255, .05); }
+.end-summary .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; font-family: var(--f-body); }
+.stat { display: flex; flex-direction: column; gap: 0; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px var(--line); }
+.stat b { font-family: var(--f-mono); font-size: 17px; font-weight: 600; color: var(--fg); line-height: 1.3; }
+.stat span { font-size: 11px; color: var(--muted) !important; text-align: left !important; font-weight: 400 !important; font-family: var(--f-body) !important; }
+.stat.hi b { color: var(--gold); text-shadow: 0 0 10px color-mix(in srgb, var(--gold) 50%, transparent); }
+@media (max-width: 560px) { .end-summary { grid-template-columns: 1fr; justify-items: center; } .offers.shop { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -1867,12 +1922,15 @@ const THEMES = {
     neon: ['#ffd166', '#ffa44d', '#7df9ff'], win: ['#ffe6b0', '#fff2d6'], winRate: .45, veil: .2, grid: '255,190,120' },
 };
 const ENDLESS_THEMES = ['dawn', 'dusk', 'night', 'rain'];
+function themeFor(col, node) {
+  if (node === 'boss') return 'crimson';
+  if (col >= ROUTE_LEN) return ENDLESS_THEMES[(col - ROUTE_LEN) % ENDLESS_THEMES.length];
+  return col <= 2 ? 'dusk' : col <= 5 ? 'night' : 'rain';
+}
 function stageTheme() {
   if (!G || G.studio) return 'night';
   if (inTutorial()) return 'dusk';
-  if (G.node === 'boss') return 'crimson';
-  if (G.col >= ROUTE_LEN) return ENDLESS_THEMES[(G.col - ROUTE_LEN) % ENDLESS_THEMES.length];
-  return G.col <= 2 ? 'dusk' : G.col <= 5 ? 'night' : 'rain';
+  return themeFor(G.col, G.node);
 }
 function cityRand(seed) {
   return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -2536,6 +2594,32 @@ window.addEventListener('resize', fitScreen);
 fitScreen();
 
 // ================= flow =================
+// ---- choice-screen art: icons for route spaces, pedals, rest and events ----
+const UI_ICONS = {
+  battle: '<path d="M5 19L17.5 6.5M19 19L6.5 6.5"/><circle cx="18.5" cy="5.5" r="2.2" fill="currentColor"/><circle cx="5.5" cy="5.5" r="2.2" fill="currentColor"/>',
+  elite:  '<path d="M5 9c0-4 3-6.5 7-6.5S19 5 19 9c0 2.5-1 4-2 5v3.5H7V14c-1-1-2-2.5-2-5z"/><path d="M5.5 6L3 2.5M18.5 6L21 2.5"/><circle cx="9.3" cy="10" r="1.7" fill="currentColor"/><circle cx="14.7" cy="10" r="1.7" fill="currentColor"/><path d="M10 17.5v3M14 17.5v3M9.5 14.5h5"/>',
+  shop:   '<path d="M4.5 8h15l-1.3 12.5H5.8z"/><path d="M8.5 10.5V6.5a3.5 3.5 0 0 1 7 0v4"/>',
+  rest:   '<path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.5 7 7 0 0 1-5-13.5z"/><path d="M15 6h3.5L15 10h3.5" stroke-width="1.6"/>',
+  event:  '<path d="M4 4.5h16v11.5h-7l-4.5 4v-4H4z"/><path d="M9.8 8.3a2.3 2.3 0 1 1 3 2.2c-.6.2-.8.6-.8 1.2"/><circle cx="12" cy="13.6" r=".6" fill="currentColor"/>',
+  boss:   '<path d="M3 18.5l1.5-11 4.5 4.5L12 4l3 8 4.5-4.5 1.5 11z"/><path d="M3.5 21h17"/>',
+  heal:   '<path d="M12 20.5S3.5 15 3.5 9A4.5 4.5 0 0 1 12 6.6 4.5 4.5 0 0 1 20.5 9c0 6-8.5 11.5-8.5 11.5z" fill="currentColor"/>',
+  up:     '<path d="M12 20V5M6 11l6-6.5 6 6.5"/><path d="M4 21h16"/>',
+  leave:  '<path d="M14 4h5v16h-5"/><path d="M4 12h11M10.5 7.5L15 12l-4.5 4.5"/>',
+  busker: '<path d="M14.5 3.5l6 6M17.5 6.5l-7.5 7.5"/><path d="M10.5 11.5c-3-1.5-6.5.5-6.5 4 0 2.6 2 4.5 4.5 4.5 3.5 0 5.5-3.5 4-6.5z"/><circle cx="8.8" cy="15.4" r="1.3" fill="currentColor"/>',
+  trade:  '<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+  tuner:  '<path d="M9 3v8a3 3 0 0 0 6 0V3"/><path d="M12 14v7"/><path d="M5 6.5c-1 1.6-1 3.4 0 5M19 6.5c1 1.6 1 3.4 0 5" stroke-width="1.6"/>',
+  pedal:  '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="9" cy="7" r="1.7"/><circle cx="15" cy="7" r="1.7"/><circle cx="12" cy="16.5" r="2.6" fill="currentColor"/><circle cx="12" cy="11.2" r=".9" fill="currentColor"/>',
+};
+const NODE_ART = { battle: ['battle', 'var(--drum)'], elite: ['elite', 'var(--harm)'], shop: ['shop', 'var(--gold)'], rest: ['rest', 'var(--bass)'], event: ['event', 'var(--lead)'], boss: ['boss', 'var(--noise)'] };
+const PEDAL_COLORS = ['#36d6ff', '#ff5fa2', '#c26dff', '#ffa44d', '#2cf2b4', '#ffd166', '#7a8cff'];
+const pedalColor = k => PEDAL_COLORS[Object.keys(RELICS).indexOf(k) % PEDAL_COLORS.length];
+const THEME_COLOR = { dusk: '#ff8a5c', night: '#7a8cff', rain: '#36d6ff', crimson: '#ff3d5a', dawn: '#ffd166' };
+const uiIcon = (name, cls = 'ico') => `<span class="${cls}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${UI_ICONS[name]}</svg></span>`;
+// A choice card: art on top, then name, description and an optional footer (price or label).
+function choiceCard(attrs, color, art, name, desc, foot = '') {
+  return `<button class="offer choice" ${attrs} style="--c:${color}"><span class="choice-art">${art}</span><span class="offer-name">${name}</span>${desc ? `<span class="offer-desc">${desc}</span>` : ''}${foot}</button>`;
+}
+const pedalCard = (k, attrs, foot = '') => choiceCard(`data-k="${k}" ${attrs}`, pedalColor(k), uiIcon('pedal'), RELICS[k].name, RELICS[k].desc, foot);
 function showModal(html, cls = '') { $('modal').innerHTML = html; $('modal').className = 'modal ' + cls; $('overlay').hidden = false; }
 function hideModal() { $('overlay').hidden = true; }
 function pick(arr, n) { const a = [...arr], out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(rnd() * a.length), 1)[0]); return out; }
@@ -2562,33 +2646,34 @@ function stageClear() {
   };
 }
 function offerTile(id, price) {
-  return `<button class="offer" data-id="${id}" ${price != null && G.coins < price ? 'disabled' : ''}>
-    <span class="offer-head">${tileHTML(id)}<span class="offer-name">${DEFS[id].name}</span></span>
-    <span class="offer-desc">${DEFS[id].desc}</span>${price != null ? `<span class="price">◎ ${price}</span>` : ''}</button>`;
+  return choiceCard(`data-id="${id}" ${price != null && G.coins < price ? 'disabled' : ''}`, `var(--${DEFS[id].cat})`, tileHTML(id), DEFS[id].name, DEFS[id].desc,
+    price != null ? `<span class="price">◎ ${price}</span>` : '');
 }
 function relicPick(then) {
   const options = pick(Object.keys(RELICS).filter(k => !G.relics[k]), 2);
   if (!options.length) return then();
   showModal(`<h2>${t('p.title')}</h2><p>${t('p.body')}</p>
-    <div class="offers two" id="offers">${options.map(k => `
-      <button class="offer" data-k="${k}"><span class="offer-name">${RELICS[k].name}</span><span class="offer-desc">${RELICS[k].desc}</span></button>`).join('')}</div>`);
+    <div class="offers two" id="offers">${options.map(k => pedalCard(k, '')).join('')}</div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('[data-k]'); if (!b) return;
     G.relics[b.dataset.k] = true; sfx('pick'); renderStatus(); then();
   };
 }
-function routeHTML(next) {
-  if (G.endless && next >= ROUTE_LEN) return `<div class="route"><span>${t('r.endless', { n: next + 1 })}</span></div>`;
-  return `<div class="route" aria-label="${t('r.aria')}">${Array.from({ length: ROUTE_LEN }, (_, i) =>
-    `<i class="${i < next ? 'done' : i === next ? 'now' : ''} ${i === ROUTE_LEN - 1 ? 'boss' : ''}"></i>`).join('')}<span>　${next + 1}/${ROUTE_LEN}</span></div>`;
+// The route as a strip of dots coloured by the time of day each space is set in, plus where you go next.
+function routeHTML(next, opts = []) {
+  const th = themeFor(next, opts.length === 1 ? opts[0] : 'battle'), T = THEMES[th];
+  const place = `<div class="place" style="--sky:linear-gradient(90deg, ${T.sky[2]}, ${T.sky[1]} 60%, ${T.sky[0]});--tc:${THEME_COLOR[th]}"><span>${t('r.next')}</span><b>${t('th.' + th)}</b></div>`;
+  if (G.endless && next >= ROUTE_LEN) return `${place}<div class="route"><span>${t('r.endless', { n: next + 1 })}</span></div>`;
+  return `${place}<div class="route" aria-label="${t('r.aria')}">${Array.from({ length: ROUTE_LEN }, (_, i) =>
+    `${i ? '<em></em>' : ''}<i style="--tc:${THEME_COLOR[themeFor(i, i === ROUTE_LEN - 1 ? 'boss' : 'battle')]}" class="${i < next ? 'done' : i === next ? 'now' : ''} ${i === ROUTE_LEN - 1 ? 'boss' : ''}"></i>`).join('')}<span>${next + 1}/${ROUTE_LEN}</span></div>`;
 }
 function chooseNext(saved) {
   const next = G.col + 1;
   const opts = Array.isArray(saved) ? saved : makeColumn(next);
   saveRun('route', opts);
-  showModal(`<h2>${t('r.title')}</h2>${routeHTML(next)}
-    <div class="offers ${opts.length === 2 ? 'two' : opts.length === 1 ? 'two' : ''}" id="offers">${opts.map(k => `
-      <button class="offer" data-n="${k}"><span class="offer-name">${NODES[k].name}</span><span class="offer-desc">${NODES[k].desc}</span></button>`).join('')}</div>`);
+  showModal(`<h2>${t('r.title')}</h2>${routeHTML(next, opts)}
+    <div class="offers ${opts.length === 2 ? 'two' : opts.length === 1 ? 'one' : ''}" id="offers">${opts.map(k =>
+      choiceCard(`data-n="${k}"`, NODE_ART[k][1], uiIcon(NODE_ART[k][0]), NODES[k].name, NODES[k].desc)).join('')}</div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('[data-n]'); if (!b) return;
     enterNode(next, b.dataset.n);
@@ -2607,12 +2692,12 @@ function showShop(stock) {
   G.phase = 'reward'; renderAll();
   stock = stock || { tiles: pick(REWARD_POOL, 4).map(id => ({ id, sold: false })), relic: pick(Object.keys(RELICS).filter(k => !G.relics[k]), 1)[0], relicSold: false };
   const r = stock.relic;
-  showModal(`<h2>${t('s.title')}</h2><p>${t('s.coins')} <b class="coins">◎ ${G.coins}</b></p>
-    <div class="offers two" id="offers">${stock.tiles.map((o, i) => o.sold
-      ? `<button class="offer" disabled><span class="offer-name">${t('s.sold')}</span></button>`
+  const sold = () => `<button class="offer choice sold" disabled><span class="choice-art">${uiIcon('shop')}</span><span class="offer-name">${t('s.sold')}</span></button>`;
+  showModal(`<div class="row"><h2>${t('s.title')}</h2><span class="purse">${t('s.coins')} <b class="coins">◎ ${G.coins}</b></span></div>
+    <div class="offers shop" id="offers">${stock.tiles.map((o, i) => o.sold ? sold()
       : offerTile(o.id, price(o.id)).replace('data-id=', `data-i="${i}" data-id=`)).join('')}
-      ${r ? (stock.relicSold ? `<button class="offer" disabled><span class="offer-name">${t('s.sold')}</span></button>`
-        : `<button class="offer" data-k="${r}" ${G.coins < relicPrice() ? 'disabled' : ''}><span class="kind">${t('p.kind')}</span><span class="offer-name">${RELICS[r].name}</span><span class="offer-desc">${RELICS[r].desc}</span><span class="price">◎ ${relicPrice()}</span></button>`) : ''}
+      ${r ? (stock.relicSold ? sold()
+        : pedalCard(r, G.coins < relicPrice() ? 'disabled' : '', `<span class="kind">${t('p.kind')}</span><span class="price">◎ ${relicPrice()}</span>`)) : ''}
     </div>
     <div class="row"><span></span><button class="btn" id="leave">${t('s.leave')}</button></div>`);
   $('offers').onclick = e => {
@@ -2628,8 +2713,8 @@ function showRest() {
   const all = [...G.hand, ...G.board.flat().filter(Boolean)].filter(t => t.lv === 1);
   showModal(`<h2>${t('rest.title')}</h2><p>${t('rest.body')}</p>
     <div class="offers two" id="offers">
-      <button class="offer" data-a="heal"><span class="offer-name">${t('rest.heal')}</span><span class="offer-desc">${t('rest.healDesc', { n: G.rank >= 2 ? 2 : 4, life: G.life })}</span></button>
-      <button class="offer" data-a="up" ${all.length ? '' : 'disabled'}><span class="offer-name">${t('rest.up')}</span><span class="offer-desc">${t('rest.upDesc')}</span></button>
+      ${choiceCard('data-a="heal"', 'var(--life)', uiIcon('heal'), t('rest.heal'), t('rest.healDesc', { n: G.rank >= 2 ? 2 : 4, life: G.life }))}
+      ${choiceCard(`data-a="up" ${all.length ? '' : 'disabled'}`, 'var(--gold)', uiIcon('up'), t('rest.up'), t('rest.upDesc'))}
     </div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('button.offer'); if (!b || b.disabled) return;
@@ -2665,8 +2750,8 @@ function showEvent() {
   const id = pick(Object.keys(EV), 1)[0], ev = EV[id];
   showModal(`<h2>${t('ev.' + id + '.title')}</h2><p>${t('ev.' + id + '.body')}</p>
     <div class="offers two" id="offers">
-      <button class="offer" data-e="go" ${ev.ok() ? '' : 'disabled'}><span class="offer-name">${t('ev.' + id + '.go')}</span><span class="offer-desc">${t('ev.' + id + '.goDesc')}</span></button>
-      <button class="offer" data-e="leave"><span class="offer-name">${t('ev.leave')}</span><span class="offer-desc">${t('ev.leaveDesc')}</span></button>
+      ${choiceCard(`data-e="go" ${ev.ok() ? '' : 'disabled'}`, 'var(--lead)', uiIcon(id), t('ev.' + id + '.go'), t('ev.' + id + '.goDesc'))}
+      ${choiceCard('data-e="leave"', 'var(--muted)', uiIcon('leave'), t('ev.leave'), t('ev.leaveDesc'))}
     </div>`);
   $('offers').onclick = e => {
     const b = e.target.closest('[data-e]'); if (!b || b.disabled) return;
@@ -2725,23 +2810,26 @@ function playAlbum(e) {
   G.phase = 'win'; G.listening = true; G.step = -1; G.acc = 0;
   fillSelects(); renderAll();
 }
+// End of a run: the final board as a little score ("your song") next to the run's numbers.
+function endSummaryHTML() {
+  const song = G.board.map(row => row.map(x => x ? `<span class="mini">${tileHTML(x.id)}</span>` : '<span class="mini empty"></span>').join('')).join('');
+  return `<div class="end-summary"><div class="end-song"><b>${t('v.song')}</b><div class="mini-board">${song}</div>
+    <small>${noteNames()[G.root]} · ${SCALES[G.scale].name}</small></div>${statsHTML()}</div>`;
+}
 function statsHTML() {
   const st = G.stats;
-  return `<div class="stats">
-    <span>${t('st.reached')}</span><span>${G.col + 1}/${ROUTE_LEN}</span>
-    <span>${t('st.battles')}</span><span>${st.battles}</span>
-    <span>${t('st.kills')}</span><span>${st.kills}</span>
-    <span>${t('st.dmg')}</span><span>${st.dmg}</span>
-    <span>${t('st.maxHit')}</span><span>${st.maxHit}</span>
-    <span>${t('st.overheats')}</span><span>${t('st.times', { n: st.overheats })}</span>
-    <span>${t('st.coins')}</span><span>${st.coins}</span>
-    <span>${t('st.fevers')}</span><span>${st.fevers || 0}</span>
-  </div>`;
+  const cell = (label, value, hi) => `<div class="stat${hi ? ' hi' : ''}"><b>${value}</b><span>${label}</span></div>`;
+  return `<div class="stats">${[
+    cell(t('st.reached'), `${G.col + 1}/${ROUTE_LEN}`, true), cell(t('st.kills'), st.kills, true),
+    cell(t('st.battles'), st.battles), cell(t('st.dmg'), st.dmg),
+    cell(t('st.maxHit'), st.maxHit), cell(t('st.fevers'), st.fevers || 0),
+    cell(t('st.coins'), st.coins), cell(t('st.overheats'), t('st.times', { n: st.overheats })),
+  ].join('')}</div>`;
 }
 function gameOver() {
   if (inTutorial()) { G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); return tutorialFailed(); }
   G.phase = 'over'; setDrive(0); sfx('fail'); renderAll(); store.del('run'); saveAlbum('lose'); recordDaily(false);
-  showModal(`<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${G.endless ? `<p class="unlock">${t('o.endless', { n: G.col + 1, best: store.get('endlessBest', G.col + 1) })}</p>` : ''}${statsHTML()}
+  showModal(`${uiIcon('elite', 'hero-ico lose')}<h2>${t('o.title')}</h2><p>${t('o.body', { kit: KITS[G.kit].name, r: G.rank, rank: rankText(G.rank) })}</p>${G.endless ? `<p class="unlock">${t('o.endless', { n: G.col + 1, best: store.get('endlessBest', G.col + 1) })}</p>` : ''}${endSummaryHTML()}
     <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('o.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><button class="btn" id="retry">${t('o.retry')}</button></div>`);
   $('exportEnd').onclick = exportSong;
   $('listenEnd').onclick = () => { hideModal(); G.enemies = []; G.phase = 'win'; G.listening = true; G.step = -1; renderAll(); };
@@ -2762,8 +2850,8 @@ function showWin() {
   let unlockMsg = '';
   const best = loadRank();
   if (G.rank >= best && best < RANK_COUNT - 1) { saveRank(best + 1); unlockMsg = `<p class="unlock">${t('v.unlock', { r: best + 1, rank: rankText(best + 1) })}</p>`; }
-  showModal(`<h2>${t('v.title')}</h2>
-    <p>${t('v.body', { kit: KITS[G.kit].name, r: G.rank })}</p>${unlockMsg}${statsHTML()}
+  showModal(`${uiIcon('boss', 'hero-ico win')}<h2>${t('v.title')}</h2>
+    <p>${t('v.body', { kit: KITS[G.kit].name, r: G.rank })}</p>${unlockMsg}${endSummaryHTML()}
     <div class="row"><span class="row" style="gap:6px"><button class="btn ghost" id="listenEnd">${t('v.listen')}</button><button class="btn ghost" id="exportEnd">${t('ex.btn')}</button></span><span class="row" style="gap:6px">${G.daily ? '' : `<button class="btn ghost" id="endlessBtn">${t('v.endless')}</button>`}<button class="btn" id="again">${t('v.again')}</button></span></div>`);
   if ($('endlessBtn')) $('endlessBtn').onclick = () => { G.endless = true; G.listening = false; G.phase = 'reward'; G.coins += 5; renderAll(); chooseNext(); };
   $('exportEnd').onclick = exportSong;

@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'r.next': '次の場所', 'v.song': 'あなたの曲',
     'bgm.rainy.name': '雨夜', 'bgm.rainy.mood': '雨音とエレピ', 'bgm.clash.name': '決戦', 'bgm.clash.mood': '轟く太鼓と警報',
     'bgm.why': '「{place}」には「{name}」がおすすめ',
     'th.dusk': '夕暮れの街', 'th.night': '夜の繁華街', 'th.rain': '雨の真夜中', 'th.crimson': '紅い月', 'th.dawn': '夜明けの街',
@@ -32,7 +33,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v3.1 — 新曲「雨夜」「決戦」',
+    'ui.proto': '試作版 v3.2 — 選択画面のデザイン刷新',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -221,6 +222,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'r.next': 'Next stop', 'v.song': 'Your song',
     'bgm.rainy.name': 'Rainy Night', 'bgm.rainy.mood': 'Rain and electric piano', 'bgm.clash.name': 'Showdown', 'bgm.clash.mood': 'Thundering drums and sirens',
     'bgm.why': '“{name}” suits {place}',
     'th.dusk': 'Dusk Avenue', 'th.night': 'Night District', 'th.rain': 'Midnight Rain', 'th.crimson': 'Crimson Moon', 'th.dawn': 'Dawn Streets',
@@ -250,7 +252,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v3.1 — New tracks: Rainy Night, Showdown',
+    'ui.proto': 'PROTOTYPE v3.2 — Redesigned choice screens',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -435,6 +437,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'r.next': '下一站', 'v.song': '你的乐曲',
     'bgm.rainy.name': '雨夜', 'bgm.rainy.mood': '雨声与电钢琴', 'bgm.clash.name': '决战', 'bgm.clash.mood': '轰鸣的鼓与警报',
     'bgm.why': '推荐适合「{place}」的「{name}」',
     'th.dusk': '黄昏街区', 'th.night': '夜之闹市', 'th.rain': '午夜之雨', 'th.crimson': '血色之月', 'th.dawn': '黎明街道',
@@ -464,7 +467,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v3.1 — 新曲「雨夜」「决战」',
+    'ui.proto': '原型 v3.2 — 选择画面重新设计',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',
