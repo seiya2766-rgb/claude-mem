@@ -61,7 +61,7 @@ async function drag(p, from, to) {
     await p.waitForTimeout(80);
     check('leaving the shop shows the route choice', (await p.$$('[data-n]')).length > 0);
 
-    for (const bt of ['boss', 'queen', 'reverser', 'warden', 'brood', 'phantom']) {
+    for (const bt of ['boss', 'queen', 'reverser', 'warden', 'brood', 'phantom', 'glitch', 'colossus', 'conductor']) {
       const r = await p.evaluate(bt => {
         const W = window.__g;
         document.getElementById('overlay').hidden = true;

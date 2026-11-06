@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'enemy.glitch.name': 'グリッチ', 'enemy.glitch.desc': '2小節ごとに盤面の2列を1小節だけ入れ替え、ダッシュを呼ぶ', 'enemy.colossus.name': '鉄の巨像', 'enemy.colossus.desc': '装甲4。1小節おきに胸が開き、そのあいだは装甲0。シールドを呼ぶ', 'enemy.conductor.name': '指揮者', 'enemy.conductor.desc': '小節ごとに指揮棒で1レーンを指し、そのレーンの手下を守る。ホッパーを呼ぶ', 'f.glitch': '{a}列と{b}列が入れ替わった', 'f.coreOpen': '核が開いた', 'f.coreShut': '装甲が閉じた', 'ach.all_bosses.name': '全ボス制覇', 'ach.all_bosses.desc': '9体すべてのボスを一度は倒す',
     'f.combo': '{n}連続撃破', 'bn.defeat': '撃破！',
     'ui.noiseShort': 'ノイズ', 'ui.noiseTip': 'たまりすぎると1小節止まる', 'ui.grooveTip': '満タンでフィーバー',
     'title.tag': 'あなたの曲が、あなたを守る。', 'title.sub': '音楽ローグライト・ディフェンス',
@@ -36,7 +37,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v3.5 — 手応えの強化',
+    'ui.proto': '試作版 v3.6 — 新ボス3体',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -225,6 +226,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'enemy.glitch.name': 'Glitch', 'enemy.glitch.desc': 'Every two bars, swaps two columns of your board for a bar; calls Dashes', 'enemy.colossus.name': 'Iron Colossus', 'enemy.colossus.desc': 'Armor 4, but every other bar its chest opens and armor drops to 0; calls Shields', 'enemy.conductor.name': 'The Conductor', 'enemy.conductor.desc': 'Each bar its baton points at a lane and shields the enemies there; calls Hoppers', 'f.glitch': 'Columns {a} and {b} swapped', 'f.coreOpen': 'Core exposed', 'f.coreShut': 'Armor shut', 'ach.all_bosses.name': 'Boss Collector', 'ach.all_bosses.desc': 'Defeat each of the nine bosses at least once',
     'f.combo': '{n} combo', 'bn.defeat': 'DEFEATED!',
     'ui.noiseShort': 'Noise', 'ui.noiseTip': 'too much stops the music for a bar', 'ui.grooveTip': 'full means Fever',
     'title.tag': 'Your song is your defense.', 'title.sub': 'A MUSIC ROGUELITE DEFENSE',
@@ -258,7 +260,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v3.5 — Game feel',
+    'ui.proto': 'PROTOTYPE v3.6 — Three new bosses',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -443,6 +445,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'enemy.glitch.name': '故障怪', 'enemy.glitch.desc': '每2小节将盘面的2列对调1小节，并召唤冲刺者', 'enemy.colossus.name': '钢铁巨像', 'enemy.colossus.desc': '护甲4，但每隔1小节胸口打开，期间护甲为0。召唤护盾', 'enemy.conductor.name': '指挥家', 'enemy.conductor.desc': '每小节用指挥棒指向1条轨道，保护该轨道上的手下。召唤跳跃者', 'f.glitch': '第{a}列与第{b}列对调了', 'f.coreOpen': '核心暴露', 'f.coreShut': '护甲关闭', 'ach.all_bosses.name': '首领收藏家', 'ach.all_bosses.desc': '9个首领各至少击败一次',
     'f.combo': '{n}连续击破', 'bn.defeat': '击破！',
     'ui.noiseShort': '噪音', 'ui.noiseTip': '过高时会停奏1小节', 'ui.grooveTip': '满格进入狂热',
     'title.tag': '你的乐曲，就是你的防线。', 'title.sub': '音乐肉鸽塔防',
@@ -476,7 +479,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v3.5 — 手感强化',
+    'ui.proto': '原型 v3.6 — 3个新首领',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',

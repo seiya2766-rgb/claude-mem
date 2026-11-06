@@ -59,7 +59,7 @@ LOOP は、4レーン×8拍のループする盤面にタイルを置いて戦�
 - **拍で考えるパズル**：奇数拍しか効かない敵、スネアを跳ね返す敵、ハットでしか見つけられない敵。敵に合わせてリズムを組み替える
 - **ノイズとグルーヴ**：強い音ほどノイズがたまり、限界を超えると演奏が止まる。攻撃を当て続ければフィーバーで一気に押し返せる
 - **毎回ちがうラン**：通常戦・強敵・ショップ・休憩・イベントから行き先を選び、タイルと装置を集めて自分だけの組み合わせを作る
-- **6つの楽器セット、6体のボス、10段階のランク、エンドレス、今日のチャレンジ**
+- **6つの楽器セット、9体のボス、10段階のランク、エンドレス、今日のチャレンジ**
 
 **音楽は自由に**
 - 音程、調、音階は戦いの強さに影響しません。好きなように変えて、自分の曲に仕上げられます
@@ -76,7 +76,7 @@ LOOP is a minimalist music roguelite played on a 4-lane, 8-beat loop. Kicks, sna
 - **Think in beats**: enemies that only take hits on odd beats, enemies that reflect your snares, enemies only a hi-hat can reveal. Rework your rhythm to beat them
 - **Noise and groove**: louder tiles build noise, and too much stops the music for a bar. Keep landing hits to trigger Fever and push back hard
 - **A different run every time**: choose your route through battles, elites, shops, rests and events, and collect tiles and pedals into combos of your own
-- **6 instrument sets, 6 bosses, 10 ranks, endless mode and a daily challenge**
+- **6 instrument sets, 9 bosses, 10 ranks, endless mode and a daily challenge**
 
 **Music without limits**
 - Pitch, key and scale never change your power. Shape your board into the song you want
@@ -93,7 +93,7 @@ LOOP 是一款在4轨×8拍循环盘面上作战的极简音乐肉鸽游戏。�
 - **以节拍思考**：只受奇数拍攻击的敌人、反弹军鼓的敌人、只有踩镲才能发现的敌人。根据敌人重新编排节奏
 - **噪音与律动**：越强的音块噪音越高，超过上限就会停奏。持续命中即可进入狂热，一举反击
 - **每局都不同**：在普通战、强敌、商店、休息和事件中选择路线，收集音块与效果器，打造自己的组合
-- **6种乐器组、6个首领、10级难度、无尽模式和每日挑战**
+- **6种乐器组、9个首领、10级难度、无尽模式和每日挑战**
 
 **自由的音乐**
 - 音高、调和音阶不会影响强度，可以随心调整成你想要的乐曲
