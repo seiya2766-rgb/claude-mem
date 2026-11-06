@@ -172,22 +172,30 @@ canvas#field.hurt { animation: hurt .25s linear; }
 .offer[aria-pressed="true"] { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
 .unlock { color: var(--gold); font-weight: 700; }
 .layout { display: flex; flex-direction: column; gap: 14px; }
-.main, .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.main, .side, .deck { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* The battlefield gets its own full-width panel above the board. */
+.arena { background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid color-mix(in srgb, var(--harm) 30%, var(--line)); border-radius: 14px; padding: 8px;
+  box-shadow: 0 0 0 1px rgba(194, 109, 255, .08), 0 10px 40px rgba(10, 0, 30, .6), inset 0 1px 0 rgba(255, 255, 255, .04); }
 .keys { display: none; }
 /* Phones: flatten the two columns and keep the hand pinned to the bottom so tiles can be dragged onto the board. */
 @media (max-width: 959px) {
-  .main, .side { display: contents; }
-  .bgm { order: 8; }
-  .coach { order: 1; } .relics { order: 2; } .meters { order: 3; } .stage { order: 4; } .controls { order: 5; }
-  #handZone { order: 6; position: sticky; bottom: 0; z-index: 6; background: var(--bg); border-top: 1px solid var(--line);
+  .main, .side, .deck { display: contents; }
+  .coach { order: 1; } .relics { order: 2; } .meters { order: 3; } .arena { order: 4; } .foes { order: 5; } .stage { order: 6; } .controls { order: 7; }
+  #handZone { order: 8; position: sticky; bottom: 0; z-index: 6; background: var(--bg); border-top: 1px solid var(--line);
     padding-block: 8px max(8px, env(safe-area-inset-bottom, 0px)); border-radius: 0; }
-  #info { order: 7; } .sound { order: 8; } details { order: 9; } .proto { order: 10; } .foes { order: 4; }
+  #info { order: 9; } .bgm { order: 10; } .sound { order: 11; } details { order: 12; } .proto { order: 13; }
 }
 @media (min-width: 960px) {
-  .app { max-width: 1180px; }
-  .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
-  .side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); max-height: calc(var(--vh) * 100 - 92px); overflow-y: auto; padding: 4px 6px 4px 4px; margin: -4px -6px -4px -4px; }
-  canvas#field { height: clamp(220px, calc(var(--vh) * 37), 410px); }
+  /* Desktop: header, meters and a full-width battlefield on top; below it three columns —
+     the board and controls, your tiles and the tile info, then enemies and sound settings.
+     The page is exactly one screen tall; the two side columns scroll on their own if they overflow. */
+  body { margin: 0; }
+  .app { max-width: 1180px; height: calc(var(--vh) * 100); }
+  .layout { flex: 1; min-height: 0; gap: 12px; }
+  .deck { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+  .main { min-height: 0; gap: 12px; }
+  .side { min-height: 0; overflow-y: auto; padding: 4px 6px 4px 4px; margin: -4px -6px -4px -4px; }
+  canvas#field { height: clamp(200px, calc(var(--vh) * 36), 520px); }
   .keys { display: inline; }
   .app { padding-block: 10px 12px; }
   #board .cell { aspect-ratio: auto; height: clamp(32px, calc(var(--vh) * 5.5), 66px); }
@@ -296,8 +304,10 @@ select { background: #1a1130; }
 /* ---- UI polish: cards, pills, icons ---- */
 .e-ico { width: 26px; height: 26px; flex: none; margin: -3px 2px -3px -2px; }
 .foes .legend { flex-direction: column; flex-wrap: nowrap; gap: 3px; }
-.foes .legend span { display: flex; align-items: center; gap: 6px; }
-.foes .legend b { white-space: nowrap; }
+.foes .legend span { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 6px; align-items: start; line-height: 1.4; }
+.foes .legend span img { grid-row: span 2; margin: 1px 0 0; }
+.foes .legend b { white-space: nowrap; font-size: 12.5px; }
+.foes .legend { gap: 7px; }
 #foesPanel .panel-title::before { background: var(--enemy); box-shadow: 0 0 8px var(--enemy); }
 .cx-ico { width: 46px; height: 46px; margin: -6px 0; }
 .legend span { display: inline-flex; align-items: center; gap: 2px; }
@@ -353,8 +363,6 @@ select { background: #1a1130; }
     </div>
   </header>
   <div class="layout">
-  <div class="main">
-
   <div class="meters">
     <div class="meter">
       <div class="meter-label"><span data-i18n="ui.noise"></span><b id="noiseText">0 / 30</b></div>
@@ -366,11 +374,16 @@ select { background: #1a1130; }
     </div>
   </div>
 
-  <section class="stage">
+  <section class="arena">
     <div class="field-wrap">
       <canvas id="field" data-i18n-aria="ui.fieldAria"></canvas>
       <canvas id="viz" aria-hidden="true"></canvas>
     </div>
+  </section>
+
+  <div class="deck">
+  <div class="main">
+  <section class="stage">
     <div class="board" id="beatNums"></div>
     <div class="board" id="board"></div>
     <div class="board-foot"><span class="tempo" id="tempoLabel"></span><span class="over-label" id="overLabel"></span></div>
@@ -383,20 +396,21 @@ select { background: #1a1130; }
     <span class="hint keys" data-i18n="ui.keys"></span>
   </div>
   </div>
-  <div class="side">
-  <div class="coach" id="coach" role="status" aria-live="polite" hidden></div>
-
-  <section class="foes" id="foesPanel">
-    <p class="panel-title" data-i18n="legend.title"></p>
-    <div class="legend" id="legend"></div>
-  </section>
-
+  <div class="side side-a">
   <section id="handZone">
     <p class="panel-title" data-i18n="ui.hand"></p>
     <div class="hand" id="hand"></div>
   </section>
 
   <div class="info" id="info"></div>
+  </div>
+  <div class="side side-b">
+  <div class="coach" id="coach" role="status" aria-live="polite" hidden></div>
+
+  <section class="foes" id="foesPanel">
+    <p class="panel-title" data-i18n="legend.title"></p>
+    <div class="legend" id="legend"></div>
+  </section>
 
   <section class="bgm" id="bgmPanel">
     <p class="panel-title" data-i18n="bgm.title"></p>
@@ -414,12 +428,12 @@ select { background: #1a1130; }
     <span class="hint" data-i18n="ui.soundNote"></span>
   </div>
 
-
   <details>
     <summary data-i18n="ui.howtoTitle"></summary>
     <ul id="howto"></ul>
   </details>
   <p class="proto" data-i18n="ui.proto"></p>
+  </div>
   </div>
   </div>
 </div>
@@ -690,7 +704,7 @@ function setLang(l) { LANG = l; SET.lang = l; store.set('settings', SET); applyS
 const langSelect = id => `<label class="check" for="${id}">${t('ui.lang')}
   <select id="${id}">${LANGS.map(l => `<option value="${l}" ${l === LANG ? 'selected' : ''}>${I18N[l]['meta.name']}</option>`).join('')}</select></label>`;
 // Colour-blind friendly palette (Okabe–Ito). Tiles also differ by shape, so colour is never the only cue.
-function applyCb() { document.documentElement.toggleAttribute('data-cb', !!SET.cb); }
+function applyCb() { document.documentElement.toggleAttribute('data-cb', !!SET.cb); fieldColors = null; }
 applyCb();
 function applyVolumes() { if (musicBus) { musicBus.gain.value = SET.music; sfxBus.gain.value = SET.sfx; bgmBus.gain.value = SET.bgm * .6; } }
 
@@ -1777,12 +1791,25 @@ function enemyIcon(type) {
 }
 // Synthwave backdrop: grid lines rush from the far right toward the speaker, faster while the music plays.
 let gridT = 0;
+// The still parts (tint, lane stripes, lane lines) are drawn once per canvas size and reused every frame.
+let backdropCache = null;
+function buildBackdrop() {
+  const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+  const g = c.getContext('2d'); g.setTransform(cx.getTransform());
+  const lh = CH / LANES, x0 = BASE_X, x1 = CW - QUEUE_W - 4;
+  const gr = g.createLinearGradient(x0, 0, x1, 0);
+  gr.addColorStop(0, 'rgba(54,214,255,.10)'); gr.addColorStop(.5, 'rgba(194,109,255,.05)'); gr.addColorStop(1, 'rgba(255,61,154,.10)');
+  g.fillStyle = gr; g.fillRect(0, 0, CW, CH);
+  for (let l = 0; l < LANES; l++) if (l % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.025)'; g.fillRect(0, l * lh, CW, lh); }
+  const lg = g.createLinearGradient(x0, 0, x1, 0); lg.addColorStop(0, 'rgba(54,214,255,.45)'); lg.addColorStop(1, 'rgba(255,61,154,.25)');
+  g.strokeStyle = lg; g.lineWidth = 1;
+  for (let l = 1; l < LANES; l++) { const y = Math.round(l * lh) + .5; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+  return { c, key: cv.width + 'x' + cv.height };
+}
 function drawBackdrop(C, dt) {
-  const lh = CH / LANES, x0 = BASE_X, x1 = CW - QUEUE_W - 4, span = x1 - x0;
-  const g = cx.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, 'rgba(54,214,255,.10)'); g.addColorStop(.5, 'rgba(194,109,255,.05)'); g.addColorStop(1, 'rgba(255,61,154,.10)');
-  cx.fillStyle = g; cx.fillRect(0, 0, CW, CH);
-  for (let l = 0; l < LANES; l++) if (l % 2 === 0) { cx.fillStyle = 'rgba(255,255,255,.025)'; cx.fillRect(0, l * lh, CW, lh); }
+  const x0 = BASE_X, x1 = CW - QUEUE_W - 4, span = x1 - x0;
+  if (!backdropCache || backdropCache.key !== cv.width + 'x' + cv.height) backdropCache = buildBackdrop();
+  cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.drawImage(backdropCache.c, 0, 0); cx.restore();
   const playing = G.phase === 'play' || G.listening || G.studio && G.listening;
   gridT = (gridT + dt * (playing ? .55 * (G.speed || 1) * (G.fever > 0 ? 1.8 : 1) : .08)) % 1;
   const N = 14;
@@ -1792,17 +1819,12 @@ function drawBackdrop(C, dt) {
     const a = .05 + .22 * (1 - u);
     cx.strokeStyle = `rgba(194,109,255,${a})`; cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, CH); cx.stroke();
   }
-  for (let l = 1; l < LANES; l++) {
-    const y = Math.round(l * lh) + .5;
-    const lg = cx.createLinearGradient(x0, 0, x1, 0);
-    lg.addColorStop(0, 'rgba(54,214,255,.45)'); lg.addColorStop(1, 'rgba(255,61,154,.25)');
-    cx.strokeStyle = lg; cx.beginPath(); cx.moveTo(x0, y); cx.lineTo(x1, y); cx.stroke();
-  }
 }
+var fieldColors = null; // cached CSS colours; cleared when the palette changes (applyCb)
 function drawField(dt) {
   if (!CW) sizeCanvas();
-  const C = { lead: css('lead'), bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
-              drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') };
+  const C = fieldColors || (fieldColors = { lead: css('lead'), bg: css('bg'), fg: css('fg'), muted: css('muted'), line: css('line'), cell: css('cell'), life: css('life'), enemy: css('enemy'), noise: css('noise'),
+              drum: css('drum'), bass: css('bass'), harm: css('harm'), lead: css('lead'), fx: css('fx') });
   cx.clearRect(0, 0, CW, CH);
   const lh = CH / LANES;
   drawBackdrop(C, dt);
@@ -1827,11 +1849,13 @@ function drawField(dt) {
     const a = Math.max(0, f.life / f.max);
     if (f.kind === 'lane') { cx.fillStyle = C[f.color]; cx.globalAlpha = .18 * a; cx.fillRect(BASE_X, f.lane * lh + 2, CW - BASE_X, lh - 4); }
     if (f.kind === 'hurt') { cx.fillStyle = C.life; cx.globalAlpha = .35 * a; cx.fillRect(0, f.lane * lh, CW, lh); }
-    if (f.kind === 'beam') { cx.save(); cx.globalCompositeOperation = 'lighter'; cx.strokeStyle = C[f.color]; cx.shadowColor = C[f.color]; cx.shadowBlur = 10;
-      cx.globalAlpha = a; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(BASE_X, laneY(f.lane)); cx.lineTo(xPix(f.x), laneY(f.lane)); cx.stroke();
+    if (f.kind === 'beam') { cx.save(); cx.globalCompositeOperation = 'lighter'; cx.strokeStyle = C[f.color];
+      cx.beginPath(); cx.moveTo(BASE_X, laneY(f.lane)); cx.lineTo(xPix(f.x), laneY(f.lane));
+      cx.globalAlpha = a * .22; cx.lineWidth = 11; cx.stroke(); cx.globalAlpha = a * .45; cx.lineWidth = 5; cx.stroke();
+      cx.globalAlpha = a; cx.lineWidth = 2.5; cx.stroke();
       cx.strokeStyle = '#ffffff'; cx.lineWidth = 1; cx.globalAlpha = a * .8; cx.stroke(); cx.restore(); }
-    if (f.kind === 'bit') { const tt = f.max - f.life; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = C[f.color] || C.enemy; cx.shadowColor = cx.fillStyle; cx.shadowBlur = 6; cx.globalAlpha = a;
-      cx.fillRect(xPix(f.x) + f.dx * tt - 2, laneY(f.lane) + f.dy * tt - 2, 4, 4); cx.restore(); }
+    if (f.kind === 'bit') { const tt = f.max - f.life; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = C[f.color] || C.enemy; const bx = xPix(f.x) + f.dx * tt, by = laneY(f.lane) + f.dy * tt;
+      cx.globalAlpha = a * .3; cx.fillRect(bx - 4, by - 4, 8, 8); cx.globalAlpha = a; cx.fillRect(bx - 2, by - 2, 4, 4); cx.restore(); }
     if (f.kind === 'pop') { cx.strokeStyle = f.ecolor || C.enemy; cx.globalAlpha = a; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(xPix(f.x), laneY(f.lane), f.r + (1 - a) * 14, 0, Math.PI * 2); cx.stroke(); }
     cx.globalAlpha = 1;
     f.life -= dt;
@@ -2735,6 +2759,8 @@ function applySpots() {
   document.querySelectorAll('.spot').forEach(e => e.classList.remove('spot'));
   if (!inTutorial() || G.phase === 'menu') return;
   for (const sel of TUT[G.tutorial].spots) document.querySelectorAll(sel).forEach(e => e.classList.add('spot'));
+  // Side columns scroll on their own; bring a highlighted panel into view if it sits below the fold.
+  const first = document.querySelector('.side .spot'); if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 function tutorialDone() {
   store.set('tutorialDone', true);
