@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'th.dusk': '夕暮れの街', 'th.night': '夜の繁華街', 'th.rain': '雨の真夜中', 'th.crimson': '紅い月', 'th.dawn': '夜明けの街',
     'legend.title': '出てくる敵',
     'notes': ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'],
     'rank.short': 'ランク{n}', 'f.next': '次', 'm.lockTag': '未解放',
@@ -29,7 +30,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v2.8 — ネオンの街並み',
+    'ui.proto': '試作版 v2.9 — ステージごとの背景',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -218,6 +219,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'th.dusk': 'Dusk Avenue', 'th.night': 'Night District', 'th.rain': 'Midnight Rain', 'th.crimson': 'Crimson Moon', 'th.dawn': 'Dawn Streets',
     'legend.title': 'Enemies in this stage',
     'notes': ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
     'rank.short': 'R{n}', 'f.next': 'NEXT', 'm.lockTag': 'LOCKED',
@@ -244,7 +246,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v2.8 — Neon city',
+    'ui.proto': 'PROTOTYPE v2.9 — Backdrops per stage',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -429,6 +431,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'th.dusk': '黄昏街区', 'th.night': '夜之闹市', 'th.rain': '午夜之雨', 'th.crimson': '血色之月', 'th.dawn': '黎明街道',
     'legend.title': '本关敌人',
     'notes': ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
     'rank.short': '等级{n}', 'f.next': '下一个', 'm.lockTag': '未解锁',
@@ -455,7 +458,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v2.8 — 霓虹街景',
+    'ui.proto': '原型 v2.9 — 每关不同背景',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',

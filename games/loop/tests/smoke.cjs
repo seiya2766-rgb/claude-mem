@@ -264,6 +264,19 @@ async function drag(p, from, to) {
     await ctx.close();
   }
 
+  // v2.9 stage backdrops
+  {
+    const { ctx, page: p } = await open(browser);
+    await p.click('#go'); await p.waitForTimeout(100);
+    const seq = await p.evaluate(() => { const W = window.__g, G = W.G, out = [];
+      for (const [col, node, endless] of [[0, 'battle'], [4, 'elite'], [7, 'battle'], [8, 'boss'], [9, 'battle', true], [10, 'shop', true]]) { G.col = col; G.node = node; G.endless = !!endless; out.push(W.stageTheme()); }
+      return out.join(','); });
+    check('backdrop changes with the stage', seq === 'dusk,night,rain,crimson,dawn,dusk', seq);
+    await p.waitForTimeout(400);
+    check('no page errors with the backdrops', p.errors.length === 0, p.errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
   const failed = results.filter(r => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
