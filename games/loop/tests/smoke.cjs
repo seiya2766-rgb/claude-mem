@@ -275,7 +275,7 @@ async function drag(p, from, to) {
     const recs = await p.evaluate(() => { const W = window.__g, G = W.G, out = []; G.scale = 'dark';
       for (const [col, node, endless] of [[0, 'battle'], [4, 'battle'], [7, 'battle'], [8, 'boss'], [9, 'battle', true], [4, 'elite']]) { G.col = col; G.node = node; G.endless = !!endless; out.push(W.recommendBgm()); }
       return out.join(','); });
-    check('BGM suggestion follows the backdrop', recs === 'dawn,neon,deep,storm,dawn,neon', recs);
+    check('BGM suggestion follows the backdrop', recs === 'dawn,neon,rainy,clash,dawn,neon', recs);
     const elite = await p.evaluate(() => { const W = window.__g, G = W.G; G.col = 4; G.node = 'elite'; G.endless = false; return W.bgmPool().join(','); });
     check('elite stages offer Storm', elite.includes('storm'), elite);
     await p.waitForTimeout(400);

@@ -1004,13 +1004,59 @@ const BGM = {
     if (c.I >= 1) lay('lead', () => { const pat = [0, 1, 0, -1]; osc('square', N(79, c.deg + pat[c.step % 4]), c.t, .02, .15, .003, 2400); });
   } },
 };
+// Steady rain: a looping 3-second noise (long enough not to sound repetitive), filtered to a hiss,
+// faded in and out so consecutive bars overlap into one continuous shower.
+const rainBufs = new WeakMap();
+function rainBed(t, dur, peak) {
+  let buf = rainBufs.get(ac);
+  if (!buf) { buf = ac.createBuffer(1, ac.sampleRate * 3, ac.sampleRate); const d = buf.getChannelData(0); let b = 0;
+    for (let i = 0; i < d.length; i++) { b = .97 * b + .03 * (Math.random() * 2 - 1); d[i] = (Math.random() * 2 - 1) * .7 + b * 4; } rainBufs.set(ac, buf); }
+  const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), lp = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = buf; s.loop = true; s.playbackRate.value = .92 + Math.random() * .16;
+  hp.type = 'highpass'; hp.frequency.value = 350; lp.type = 'lowpass'; lp.frequency.value = 3000;
+  s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(bus || musicBus);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + .35); g.gain.setValueAtTime(peak, t + dur); g.gain.linearRampToValueAtTime(0, t + dur + .4);
+  s.start(t, Math.random() * 2); s.stop(t + dur + .45);
+}
+// Rainy Night (Midnight Rain stage): a bed of rain, falling droplets, soft electric-piano chords, brushed drums, a lonely echoing line.
+BGM.rainy = { aff: ['minor', 'dark', 'blues'], play: c => {
+  const sd = STEP_DUR / G.speed;
+  if (c.step === 0) lay('drum', () => rainBed(c.t, sd * 8, .045));
+  if (Math.random() < .55) lay('lead', () => osc('sine', N(96, Math.floor(Math.random() * c.n * 1.5)), c.t + Math.random() * sd, .012 + Math.random() * .012, .18, .002));
+  if (c.step === 0 || c.step === 4) lay('harm', () => [0, 2, 4, 6].forEach((d, k) => {
+    const f = N(57, c.deg + d), at = c.t + k * .018; osc('sine', f, at, .03, 1.6, .02); osc('triangle', f * 2.003, at, .008, .6, .01); }));
+  if (c.step === 0) lay('bass', () => osc('sine', N(33, c.deg), c.t, .13, sd * 7, .08));
+  if (c.I >= 1 && c.step === 6 && c.bar % 2 === 0) lay('lead', () => { const f = N(76, c.deg + 4 - (c.bar % 4 === 0 ? 0 : 1));
+    for (let k = 0; k < 4; k++) osc('triangle', f, c.t + k * sd * 1.5, .04 * Math.pow(.5, k), .5, .02); });
+  if (c.I >= 2) lay('drum', () => {
+    if (c.step === 0 || (c.I >= 3 && c.step === 5)) bKick(c.t, .3);
+    if (c.step === 4) noiseHit(c.t, 'bandpass', 2200, .1, .22);
+    if (c.step % 2 === 1) noiseHit(c.t + .03 / G.speed, 'bandpass', 5000, .03, .07);
+  });
+} };
+// Showdown (boss stages): orchestral hits on a dotted rhythm, octave-leaping bass, tom fills, crash, sirens and a racing hook.
+BGM.clash = { aff: ['dark', 'minor', 'blues'], play: c => {
+  const sd = STEP_DUR / G.speed;
+  if (c.step === 0 || c.step === 3) lay('harm', () => { pad(c.t, [c.deg, c.deg + 2, c.deg + 4], 48, .034, .35, 'sawtooth', 1600, .005); pad(c.t, [c.deg + c.n], 60, .022, .3, 'square', 2000, .005); });
+  lay('bass', () => osc('sawtooth', N(c.step % 2 ? 36 : 24, c.deg), c.t, .075, sd * .9, .004, 650 + 150 * c.I));
+  lay('drum', () => {
+    if (c.step % 2 === 0 || c.I >= 3) bKick(c.t, .38);
+    if (c.step === 2 || c.step === 6) { noiseHit(c.t, 'bandpass', 1400, .15, .18); osc('triangle', 180, c.t, .06, .08); }
+    if (c.bar === 0 && c.step === 0) noiseHit(c.t, 'highpass', 4000, .1, 1.4);
+    if (c.bar === 3 && c.step >= 5) { const o = osc('sine', 210 - (c.step - 5) * 45, c.t, .26, .28); o.frequency.exponentialRampToValueAtTime(70, c.t + .25);
+      const o2 = osc('sine', 210 - (c.step - 5) * 45, c.t + sd / 2, .2, .25); o2.frequency.exponentialRampToValueAtTime(70, c.t + sd / 2 + .22); }
+  });
+  if (c.I >= 1 && c.step === 0 && c.bar % 2 === 0) lay('lead', () => { const f = N(79, c.deg), o = osc('square', f, c.t, .018, sd * 7.5, .1, 1800);
+    o.frequency.linearRampToValueAtTime(f * 1.5, c.t + sd * 4); o.frequency.linearRampToValueAtTime(f, c.t + sd * 7.5); });
+  if (c.I >= 2) lay('lead', () => { const pat = [4, 3, 2, 0]; [0, 1].forEach(k => osc('square', N(72, c.deg + pat[(c.step * 2 + k) % 4]), c.t + k * sd / 2, .02, .1, .002, 3200)); });
+} };
 const BGM_IDS = Object.keys(BGM);
 // Each backdrop has its own BGM candidates, best fit first (see THEMES and stageTheme()).
 const THEME_BGM = {
   dusk:    ['dawn', 'lofi', 'deep'],      // a calm start as the sun goes down
   night:   ['neon', 'lofi', 'festival'],  // the district wakes up
-  rain:    ['deep', 'lofi', 'neon'],      // heavy, quiet, wet
-  crimson: ['storm', 'neon', 'festival'], // bosses under the red moon
+  rain:    ['rainy', 'deep', 'lofi'],     // rain, piano and a lonely echo
+  crimson: ['clash', 'storm', 'neon'],    // bosses under the red moon
   dawn:    ['dawn', 'lofi', 'festival'],  // morning light in endless
 };
 function bgmPool() {
