@@ -192,7 +192,7 @@ canvas#field.hurt { animation: hurt .25s linear; }
   body { margin: 0; }
   .app { max-width: 1180px; height: calc(var(--vh) * 100); }
   .layout { flex: 1; min-height: 0; gap: 12px; }
-  .deck { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+  .deck { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, .95fr); gap: 16px; align-items: stretch; }
   .main { min-height: 0; gap: 12px; }
   .side { min-height: 0; overflow-y: auto; padding: 4px 6px 4px 4px; margin: -4px -6px -4px -4px; }
   canvas#field { height: clamp(200px, calc(var(--vh) * 36), 520px); }
@@ -322,8 +322,8 @@ select { background: #1a1130; }
 .status .life { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--life) 45%, transparent); }
 .status .coins { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent); }
 .meter-label b { white-space: nowrap; }
-.meter-label span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--noise); box-shadow: 0 0 6px var(--noise); }
-.meter:nth-child(2) .meter-label span::before { background: var(--lead); box-shadow: 0 0 6px var(--lead); }
+.meter-label > span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--noise); box-shadow: 0 0 6px var(--noise); }
+.meter:nth-child(2) .meter-label > span::before { background: var(--lead); box-shadow: 0 0 6px var(--lead); }
 .lane-num { color: var(--drum); text-shadow: 0 0 6px color-mix(in srgb, var(--drum) 60%, transparent); }
 .chip { padding: 3px 11px 3px 3px; gap: 7px; }
 .chip .tile { width: 28px; height: 28px; }
@@ -422,6 +422,42 @@ body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent);
   .hero-tag { margin: 8px 0 0; font-family: var(--f-display); font-size: 27px; color: #fff; text-shadow: 0 0 18px rgba(255, 95, 162, .8), 0 2px 0 rgba(0, 0, 0, .5); }
   .hero-sub { margin: 0; font-size: 14px; letter-spacing: .12em; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 6px rgba(0, 0, 0, .8); }
 }
+/* ---- battle HUD polish ---- */
+.meter-label { align-items: baseline; }
+.meter-label > span { display: inline-flex; align-items: baseline; gap: 8px; color: var(--fg); font-weight: 700; letter-spacing: .06em; }
+.meter-tip { font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.meter-label > span { white-space: nowrap; }
+@media (max-width: 959px) { .meter-tip, .panel-hint { display: none; } }
+.meter-label b { font-size: 13px; }
+.bar { height: 10px; border-radius: 5px; }
+.bar > i { border-radius: 5px; }
+/* tick marks every 10% so the bars read like a level meter */
+.bar::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(7, 4, 15, .55) calc(10% - 1px) 10%); }
+.bar .danger { position: absolute; top: 0; bottom: 0; right: 0; width: 25%; pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(255, 61, 127, .22) 0 4px, transparent 4px 8px); box-shadow: inset 1px 0 0 rgba(255, 61, 127, .6); }
+.bar.groove > i { transition: width .15s ease-out; }
+.bar.fever { box-shadow: 0 0 14px -2px #ff5fa2; }
+.panel-title { flex-wrap: wrap; row-gap: 0; }
+.panel-hint { font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+/* the board: odd beats (1, 3, 5, 7: the ones Shields can be hit on) are a shade lighter; a gap marks the half bar */
+.beat-num.odd { color: var(--fg); }
+.beat-num.down { color: var(--drum); text-shadow: 0 0 6px color-mix(in srgb, var(--drum) 60%, transparent); }
+.cell.odd { background: color-mix(in srgb, var(--cell) 62%, #50408c); }
+#board .cell.half, #beatNums .beat-num:nth-child(6) { margin-left: 6px; }
+/* key hints as keycaps */
+.controls .keys { display: flex; gap: 4px 12px; flex-wrap: nowrap; align-items: center; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.kh { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 11.5px; }
+.kh kbd { font: 600 10.5px var(--f-mono); color: var(--fg); padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, .07);
+  box-shadow: inset 0 -1.5px 0 rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .14); }
+/* the battlefield frame reacts: rainbow glow in Fever, a red pulse when noise is about to overheat */
+.arena { transition: box-shadow .3s, border-color .3s; }
+.arena.fever { border-color: transparent; box-shadow: 0 0 0 2px #ff5fa2, 0 0 30px -4px #ff5fa2, 0 0 60px -10px #36d6ff; animation: feverFrame 1.2s linear infinite; }
+@keyframes feverFrame { 0%, 100% { box-shadow: 0 0 0 2px #ff5fa2, 0 0 30px -4px #ff5fa2, 0 0 60px -10px #36d6ff; } 33% { box-shadow: 0 0 0 2px #36d6ff, 0 0 30px -4px #36d6ff, 0 0 60px -10px #ffa44d; } 66% { box-shadow: 0 0 0 2px #ffa44d, 0 0 30px -4px #ffa44d, 0 0 60px -10px #c26dff; } }
+.arena.danger:not(.fever) { animation: dangerFrame .9s ease-in-out infinite; }
+@keyframes dangerFrame { 50% { box-shadow: 0 0 0 1.5px var(--noise), 0 0 26px -6px var(--noise); } }
+@media (prefers-reduced-motion: reduce) { .arena.fever, .arena.danger { animation: none; } }
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -451,11 +487,11 @@ body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent);
   <div class="layout">
   <div class="meters">
     <div class="meter">
-      <div class="meter-label"><span data-i18n="ui.noise"></span><b id="noiseText">0 / 30</b></div>
-      <div class="bar" id="noiseBar"><i></i></div>
+      <div class="meter-label"><span><span data-i18n="ui.noiseShort"></span><small class="meter-tip" data-i18n="ui.noiseTip"></small></span><b id="noiseText">0 / 30</b></div>
+      <div class="bar" id="noiseBar"><i></i><em class="danger"></em></div>
     </div>
     <div class="meter">
-      <div class="meter-label"><span data-i18n="ui.groove"></span><b id="grooveText">0%</b></div>
+      <div class="meter-label"><span><span data-i18n="ui.groove"></span><small class="meter-tip" data-i18n="ui.grooveTip"></small></span><b id="grooveText">0%</b></div>
       <div class="bar groove" id="grooveBar"><i></i></div>
     </div>
   </div>
@@ -484,7 +520,7 @@ body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent);
   </div>
   <div class="side side-a">
   <section id="handZone">
-    <p class="panel-title" data-i18n="ui.hand"></p>
+    <p class="panel-title"><span id="handTitle" data-i18n="ui.hand"></span><small class="panel-hint" data-i18n="ui.handHint"></small></p>
     <div class="hand" id="hand"></div>
   </section>
 
@@ -2168,7 +2204,7 @@ function drawField(dt) {
     cx.fillText(String(l + 1), 9, laneY(l));
   }
   if (G.fever > 0) { const fg = cx.createLinearGradient(0, 0, CW, 0); fg.addColorStop(0, '#36d6ff'); fg.addColorStop(.5, '#ff5fa2'); fg.addColorStop(1, '#ffa44d');
-    cx.fillStyle = fg; cx.globalAlpha = .08 + .07 * (G.pulse || 0); cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; }
+    cx.fillStyle = fg; cx.globalAlpha = .03 + .05 * (G.pulse || 0); cx.fillRect(0, 0, CW, CH); cx.globalAlpha = 1; }
   // speaker / base line
   const pw = 3 + (G.pulse || 0) * 4;
   cx.shadowColor = C.playhead || C.drum; cx.shadowBlur = 12 + (G.pulse || 0) * 14;
@@ -2234,7 +2270,7 @@ function drawField(dt) {
     cx.globalAlpha = a; cx.fillStyle = t.warn ? C.noise : t.big ? C.lead : C.fg;
     cx.font = t.warn ? '700 12px ' + css('f-body') : t.big ? '700 17px "IBM Plex Mono", monospace' : '600 11px "IBM Plex Mono", monospace';
     const tx = Math.max(40, Math.min(CW - 40, xPix(t.x)));
-    cx.fillText(t.txt, tx, laneY(t.lane) - 14 - (1 - a) * 8);
+    cx.fillText(t.txt, tx, Math.max(9, laneY(t.lane) - Math.max(14, CH / LANES * .5) - (1 - a) * 8));
     t.life -= dt;
   }
   cx.globalAlpha = 1;
@@ -2321,7 +2357,7 @@ function tileHTML(id) {
   return `<span class="tile cat-${d.cat}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[id] || ''}</svg></span>`;
 }
 function renderBeats() {
-  $('beatNums').innerHTML = '<div></div>' + Array.from({ length: STEPS }, (_, s) => `<div class="beat-num">${s + 1}</div>`).join('');
+  $('beatNums').innerHTML = '<div></div>' + Array.from({ length: STEPS }, (_, s) => `<div class="beat-num${s % 2 ? '' : ' odd'}${s % 4 ? '' : ' down'}">${s + 1}</div>`).join('');
 }
 function renderBoard() {
   let html = '';
@@ -2330,7 +2366,7 @@ function renderBoard() {
     for (let s = 0; s < STEPS; s++) {
       const tl = G.board[l][s];
       const sel = G.selCell && G.selCell.l === l && G.selCell.s === s;
-      const cls = ['cell', G.selHand >= 0 ? 'target' : '', sel ? 'selc' : '', tl && tl.p != null ? 'custom' : '', tl && tl.lv === 2 ? 'lv2' : ''].join(' ');
+      const cls = ['cell', s % 2 ? '' : 'odd', s === 4 ? 'half' : '', G.selHand >= 0 ? 'target' : '', sel ? 'selc' : '', tl && tl.p != null ? 'custom' : '', tl && tl.lv === 2 ? 'lv2' : ''].join(' ');
       html += `<button class="${cls}" data-l="${l}" data-s="${s}" aria-label="${t('b.cellAria', { l: l + 1, s: s + 1, name: tl ? tName(tl) : t('b.empty') })}">${tl ? tileHTML(tl.id) : ''}</button>`;
     }
   }
@@ -2361,6 +2397,8 @@ function renderNoise() {
   $('grooveText').textContent = G.fever > 0 ? t('f.fever') : gv + '%';
   $('grooveBar').firstElementChild.style.width = gv + '%';
   $('grooveBar').classList.toggle('fever', G.fever > 0);
+  document.querySelector('.arena').classList.toggle('fever', G.fever > 0 && G.phase === 'play');
+  document.querySelector('.arena').classList.toggle('danger', G.noise >= m * .75 && G.phase === 'play');
 }
 function renderTempo() {
   const el = $('tempoLabel');
@@ -2443,7 +2481,7 @@ const paletteIds = () => { const seen = new Set([...STARTER, ...store.get('seenT
 function renderHand() {
   const el = $('hand');
   recordSeen();
-  document.querySelector('#handZone .panel-title').textContent = G.studio ? t('studio.palette') : t('ui.hand');
+  $('handTitle').textContent = G.studio ? t('studio.palette') : t('ui.hand');
   if (!G.hand.length) { el.innerHTML = `<span class="empty-hand">${t('h.allPlaced')}</span>`; return; }
   el.innerHTML = G.hand.map((t, i) =>
     `<button class="chip ${i === G.selHand ? 'sel' : ''}" data-i="${i}">${tileHTML(t.id)}<span>${tName(t)}</span></button>`).join('');
@@ -2996,7 +3034,16 @@ $('menuBtn').addEventListener('click', () => { ensureAudio(); showMenu(); });
 // The hint under the controls follows the last device used, so a controller player sees button names.
 let lastInput = 'mouse';
 function setInput(kind) { if (lastInput !== kind) { lastInput = kind; updateKeysHint(); } }
-function updateKeysHint() { const el = document.querySelector('.keys'); const txt = t(lastInput === 'pad' ? 'ui.keysPad' : 'ui.keys'); el.textContent = txt; el.title = txt; }
+// Key hints as little keycaps: "Space start · Esc menu" -> <kbd>Space</kbd> start ...
+function updateKeysHint() {
+  const el = document.querySelector('.keys'), txt = t(lastInput === 'pad' ? 'ui.keysPad' : 'ui.keys');
+  const esc = x => x.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  el.innerHTML = txt.split(/\s*[　·]\s*/).filter(Boolean).map(part => {
+    const m = part.match(/^(\S+(?:\s*[+＋]\s*\S+)?)\s+(.+)$/);
+    return m ? `<span class="kh">${m[1].split(/\s*[+＋]\s*/).map(k => `<kbd>${esc(k)}</kbd>`).join('+')}<span>${esc(m[2])}</span></span>` : `<span class="kh">${esc(part)}</span>`;
+  }).join('');
+  el.title = txt;
+}
 document.addEventListener('pointerdown', () => setInput('mouse'), true);
 // Arrow keys or the d-pad move a cursor over the board; the same actions drive menus, so the game is playable without a mouse.
 let cursor = { l: 1, s: 0, on: false }, held = null;

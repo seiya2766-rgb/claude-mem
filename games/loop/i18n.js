@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'ui.noiseShort': 'ノイズ', 'ui.noiseTip': 'たまりすぎると1小節止まる', 'ui.grooveTip': '満タンでフィーバー',
     'title.tag': 'あなたの曲が、あなたを守る。', 'title.sub': '音楽ローグライト・ディフェンス',
     'r.next': '次の場所', 'v.song': 'あなたの曲',
     'bgm.rainy.name': '雨夜', 'bgm.rainy.mood': '雨音とエレピ', 'bgm.clash.name': '決戦', 'bgm.clash.mood': '轟く太鼓と警報',
@@ -19,7 +20,7 @@ window.LOOP_I18N = {
     'ui.listen': '♪ 試聴', 'ui.listenStop': '■ 試聴を止める', 'ui.speed': '速度 ×{n}',
     'ui.keys': 'Space 開始　矢印＋Enter 置く・動かす　Q/E タイル選択　Del 戻す　[ ] 音程　Esc メニュー',
     'ui.key': '調', 'ui.scale': '音階', 'ui.soundNote': '音の設定は強さに影響しません',
-    'ui.hand': '手持ちのタイル（盤面へドラッグ。盤面からここへ戻すこともできます）',
+    'ui.hand': '手持ちのタイル', 'ui.handHint': 'ドラッグで盤面へ。盤面から戻すこともできます',
     'ui.howtoTitle': '遊び方',
     'ui.howto': [
       '上のレーンを、敵が左のスピーカーに向かって進んできます。たどり着かれるとライフが減ります。',
@@ -34,7 +35,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v3.3 — タイトル画面',
+    'ui.proto': '試作版 v3.4 — 戦闘画面の磨き込み',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -223,6 +224,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'ui.noiseShort': 'Noise', 'ui.noiseTip': 'too much stops the music for a bar', 'ui.grooveTip': 'full means Fever',
     'title.tag': 'Your song is your defense.', 'title.sub': 'A MUSIC ROGUELITE DEFENSE',
     'r.next': 'Next stop', 'v.song': 'Your song',
     'bgm.rainy.name': 'Rainy Night', 'bgm.rainy.mood': 'Rain and electric piano', 'bgm.clash.name': 'Showdown', 'bgm.clash.mood': 'Thundering drums and sirens',
@@ -239,7 +241,7 @@ window.LOOP_I18N = {
     'ui.listen': '♪ Preview', 'ui.listenStop': '■ Stop preview', 'ui.speed': 'Speed ×{n}',
     'ui.keys': 'Space start · Arrows + Enter place/move · Q/E pick tile · Del remove · [ ] pitch · Esc menu',
     'ui.key': 'Key', 'ui.scale': 'Scale', 'ui.soundNote': 'Sound settings never change your power',
-    'ui.hand': 'Your tiles (drag onto the board, or drag board tiles back here)',
+    'ui.hand': 'Your tiles', 'ui.handHint': 'Drag onto the board, or drag board tiles back here',
     'ui.howtoTitle': 'How to play',
     'ui.howto': [
       'Enemies march along the lanes above toward your speaker on the left. Each one that reaches it costs you life.',
@@ -254,7 +256,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v3.3 — Title screen',
+    'ui.proto': 'PROTOTYPE v3.4 — Battle screen polish',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -439,6 +441,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'ui.noiseShort': '噪音', 'ui.noiseTip': '过高时会停奏1小节', 'ui.grooveTip': '满格进入狂热',
     'title.tag': '你的乐曲，就是你的防线。', 'title.sub': '音乐肉鸽塔防',
     'r.next': '下一站', 'v.song': '你的乐曲',
     'bgm.rainy.name': '雨夜', 'bgm.rainy.mood': '雨声与电钢琴', 'bgm.clash.name': '决战', 'bgm.clash.mood': '轰鸣的鼓与警报',
@@ -455,7 +458,7 @@ window.LOOP_I18N = {
     'ui.listen': '♪ 试听', 'ui.listenStop': '■ 停止试听', 'ui.speed': '速度 ×{n}',
     'ui.keys': 'Space 开始　方向键+Enter 放置/移动　Q/E 选择音块　Del 移除　[ ] 音高　Esc 菜单',
     'ui.key': '调', 'ui.scale': '音阶', 'ui.soundNote': '声音设置不会影响强度',
-    'ui.hand': '手中的音块（拖到盘面上，也可以从盘面拖回这里）',
+    'ui.hand': '手中的音块', 'ui.handHint': '拖到盘面上，也可以从盘面拖回这里',
     'ui.howtoTitle': '玩法',
     'ui.howto': [
       '敌人沿上方轨道向左侧的扬声器推进。被敌人抵达会损失生命。',
@@ -470,7 +473,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v3.3 — 标题画面',
+    'ui.proto': '原型 v3.4 — 战斗画面打磨',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',
