@@ -65,10 +65,11 @@ function loadIcons() {
 }
 function drawPad(id, x, y, w, glow) {
   const c = C[CAT[id]], r = w * .26;
-  const g = cx.createRadialGradient(x + w * .28, y + w * .18, 0, x + w * .28, y + w * .18, w * 1.3);
-  g.addColorStop(0, '#ffffff'); g.addColorStop(.12, c); g.addColorStop(1, c);
-  cx.shadowColor = c; cx.shadowBlur = glow ? w * .7 : w * .25;
-  cx.fillStyle = g; cx.beginPath(); cx.roundRect(x, y, w, w, r); cx.fill(); cx.shadowBlur = 0;
+  // flat keycap like the game's tiles: solid colour, darker bottom edge, ink rim
+  if (glow) { cx.fillStyle = 'rgba(255,255,255,.18)'; cx.beginPath(); cx.roundRect(x - w * .08, y - w * .08, w * 1.16, w * 1.16, r * 1.2); cx.fill(); }
+  cx.fillStyle = c; cx.beginPath(); cx.roundRect(x, y, w, w, r); cx.fill();
+  cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.roundRect(x, y + w * .88, w, w * .12, [0, 0, r, r]); cx.fill();
+  cx.strokeStyle = 'rgba(18,8,31,.55)'; cx.lineWidth = Math.max(1, w * .03); cx.beginPath(); cx.roundRect(x, y, w, w, r); cx.stroke();
   if (iconImg[id]) cx.drawImage(iconImg[id], x + w * .15, y + w * .15, w * .7, w * .7);
 }
 const SHAPE = { drum: 'circle', bass: 'square', harm: 'tri', lead: 'diamond', fx: 'square' };
@@ -142,8 +143,11 @@ function draw() {
     cx.textAlign = align; cx.textBaseline = 'middle';
     cx.font = `400 ${size}px "Dela Gothic One", sans-serif`;
     const m0 = cx.measureText('LOOP'), x0 = align === 'center' ? lx - m0.width / 2 : lx;
-    const lg = cx.createLinearGradient(x0, 0, x0 + m0.width, 0); lg.addColorStop(0, '#36d6ff'); lg.addColorStop(.5, '#c26dff'); lg.addColorStop(1, '#ff5fa2');
-    cx.shadowColor = '#c26dff'; cx.shadowBlur = size * .25; cx.fillStyle = lg; cx.fillText('LOOP', lx, ly); cx.shadowBlur = 0;
+    // printed logo, as in the game: paper-coloured type over an offset pink pass and a faint cyan pass
+    const off = size * .045;
+    cx.fillStyle = 'rgba(54,214,255,.55)'; cx.fillText('LOOP', lx - off * .5, ly - off * .4);
+    cx.fillStyle = '#ff5d73'; cx.fillText('LOOP', lx + off, ly + off * .85);
+    cx.fillStyle = '#f3ecdf'; cx.fillText('LOOP', lx, ly);
     // Eight step lights under the logo.
     const m = cx.measureText('LOOP'), lw = m.width, sx = align === 'center' ? lx - lw / 2 : lx, sw = lw / 8;
     for (let i = 0; i < 8; i++) { cx.fillStyle = i === 5 ? C.lead : i % 2 ? '#3a4052' : C.drum; cx.fillRect(sx + i * sw + sw * .12, ly + size * .52, sw * .76, size * .09); }
