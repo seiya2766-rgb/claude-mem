@@ -2,6 +2,7 @@
 // In the Steam build the default language comes from Steam (steamworks getCurrentGameLanguage).
 window.LOOP_I18N = {
   ja: {
+    'legend.title': '出てくる敵',
     'notes': ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'],
     'rank.short': 'ランク{n}', 'f.next': '次', 'm.lockTag': '未解放',
     'meta.name': '日本語',
@@ -28,7 +29,7 @@ window.LOOP_I18N = {
       '攻撃を当て続けるとグルーヴがたまり、満タンで2小節のフィーバー（攻撃1.5倍）。敵に抜かれると減ります。',
       '挑戦は戦闘の開始時と行き先を選ぶときに自動保存されます。',
     ],
-    'ui.proto': '試作版 v2.5 — 敵をモンスターに',
+    'ui.proto': '試作版 v2.6 — 戦場を大きく',
     'ui.lang': '言語',
     // board & field
     'f.immune': '無効', 'f.reflect': '反射', 'f.sealFloat': '{n}拍目を封印',
@@ -217,6 +218,7 @@ window.LOOP_I18N = {
   },
 
   en: {
+    'legend.title': 'Enemies in this stage',
     'notes': ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
     'rank.short': 'R{n}', 'f.next': 'NEXT', 'm.lockTag': 'LOCKED',
     'meta.name': 'English',
@@ -242,7 +244,7 @@ window.LOOP_I18N = {
       'Keep landing hits to build Groove. When it fills up you get two bars of Fever (attacks ×1.5). Letting an enemy through drains it.',
       'Your run is saved automatically at the start of each battle and whenever you choose a route.',
     ],
-    'ui.proto': 'PROTOTYPE v2.5 — Monsters',
+    'ui.proto': 'PROTOTYPE v2.6 — Bigger battlefield',
     'ui.lang': 'Language',
     'f.immune': 'Immune', 'f.reflect': 'Reflected', 'f.sealFloat': 'Beat {n} sealed',
     'f.idle': '{node} — place tiles, then press Start stage',
@@ -427,6 +429,7 @@ window.LOOP_I18N = {
   },
 
   zh: {
+    'legend.title': '本关敌人',
     'notes': ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
     'rank.short': '等级{n}', 'f.next': '下一个', 'm.lockTag': '未解锁',
     'meta.name': '简体中文',
@@ -452,7 +455,7 @@ window.LOOP_I18N = {
       '持续命中可积累律动，充满后进入2小节的狂热（攻击×1.5）。被敌人突破会减少律动。',
       '每场战斗开始时以及选择路线时会自动保存进度。',
     ],
-    'ui.proto': '原型 v2.5 — 怪物登场',
+    'ui.proto': '原型 v2.6 — 更大的战场',
     'ui.lang': '语言',
     'f.immune': '无效', 'f.reflect': '反射', 'f.sealFloat': '封印第{n}拍',
     'f.idle': '{node}　摆好音块后点击“开始关卡”',
