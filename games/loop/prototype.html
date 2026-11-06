@@ -227,6 +227,8 @@ canvas#field.hurt { animation: hurt .25s linear; }
 canvas#viz { position: absolute; left: 1px; right: 1px; bottom: 1px; width: calc(100% - 2px); height: 12%; display: block; opacity: .2; pointer-events: none; mix-blend-mode: screen; border-radius: 0 0 8px 8px; }
 .bgm { display: flex; flex-direction: column; gap: 6px; }
 .bgm .hint { margin: 0; }
+.bgm .bgm-why { color: var(--gold); font-weight: 600; font-size: 12.5px; margin: -2px 0 2px; }
+.bgm .bgm-why::before { content: "★ "; }
 .bgm-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .bgm-chip { font: inherit; color: var(--fg); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px;
   padding: 6px 10px; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left; min-width: 0; }
@@ -414,6 +416,7 @@ select { background: #1a1130; }
 
   <section class="bgm" id="bgmPanel">
     <p class="panel-title" data-i18n="bgm.title"></p>
+    <p class="hint bgm-why" id="bgmWhy"></p>
     <div class="bgm-list" id="bgmList"></div>
     <p class="hint" data-i18n="bgm.note"></p>
   </section>
@@ -1002,19 +1005,24 @@ const BGM = {
   } },
 };
 const BGM_IDS = Object.keys(BGM);
+// Each backdrop has its own BGM candidates, best fit first (see THEMES and stageTheme()).
+const THEME_BGM = {
+  dusk:    ['dawn', 'lofi', 'deep'],      // a calm start as the sun goes down
+  night:   ['neon', 'lofi', 'festival'],  // the district wakes up
+  rain:    ['deep', 'lofi', 'neon'],      // heavy, quiet, wet
+  crimson: ['storm', 'neon', 'festival'], // bosses under the red moon
+  dawn:    ['dawn', 'lofi', 'festival'],  // morning light in endless
+};
 function bgmPool() {
   if (G.studio || G.album) return BGM_IDS;
-  if (inTutorial()) return ['dawn', 'lofi', 'deep'];
-  if (G.node === 'boss') return ['storm', 'neon', 'festival'];
-  if (G.node === 'elite') return ['storm', 'deep', 'neon'];
-  if (G.col <= 2) return ['dawn', 'lofi', 'deep'];
-  if (G.col <= 5) return ['neon', 'lofi', 'festival'];
-  return ['deep', 'neon', 'festival'];
+  const pool = THEME_BGM[stageTheme()];
+  return G.node === 'elite' && !pool.includes('storm') ? [pool[0], 'storm', pool[1]] : pool;
 }
-// Recommend the candidate whose mood suits the scale the player chose.
+// Recommend what suits the backdrop; when two fit about as well, the one that matches the player's scale wins.
 function recommendBgm() {
-  const pool = bgmPool();
-  return pool.find(id => BGM[id].aff[0] === G.scale) || pool.find(id => BGM[id].aff.includes(G.scale)) || pool[0];
+  const pool = bgmPool(), n = pool.length;
+  const score = (id, i) => (n - i) * 2 + (BGM[id].aff[0] === G.scale ? 2 : BGM[id].aff.includes(G.scale) ? 1 : 0);
+  return pool.reduce((best, id, i) => score(id, i) > score(best, pool.indexOf(best)) ? id : best, pool[0]);
 }
 function currentBgm() {
   if (G.album) return G.bgm;
@@ -1056,7 +1064,9 @@ function idleBgm(dt) {
   while (idleAcc >= STEP_DUR) { idleAcc -= STEP_DUR; bgmStep(idleCount % STEPS, idleCount, ac.currentTime + .02); idleCount++; G.pulse = idleCount % 4 === 1 ? .6 : G.pulse; }
 }
 function renderBgm() {
-  const cur = currentBgm(), rec = recommendBgm();
+  const cur = currentBgm(), rec = recommendBgm(), why = $('bgmWhy');
+  why.hidden = !!(G.studio || G.album);
+  if (!why.hidden) why.textContent = t('bgm.why', { place: t('th.' + stageTheme()), name: t('bgm.' + rec + '.name') });
   $('bgmList').innerHTML = [...bgmPool(), 'off'].map(id => `<button class="bgm-chip" data-bgm="${id}" aria-pressed="${id === cur}">
       ${id === rec ? `<span class="rec">★ ${t('bgm.rec')}</span>` : ''}<b>${t('bgm.' + id + '.name')}</b>${id === 'off' ? '' : `<small>${t('bgm.' + id + '.mood')}</small>`}</button>`).join('');
 }
@@ -2998,7 +3008,7 @@ G = newGame();
 fillSelects();
 renderAll();
 showStart();
-window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode, spawn, drawEnemy, stageTheme };
+window.__g = { get G() { return G; }, DEFS, KITS, startStage, doStep, update, makePlan, enterNode, spawn, drawEnemy, stageTheme, recommendBgm, bgmPool };
 requestAnimationFrame(frame);
 })();
 </script>

@@ -272,6 +272,12 @@ async function drag(p, from, to) {
       for (const [col, node, endless] of [[0, 'battle'], [4, 'elite'], [7, 'battle'], [8, 'boss'], [9, 'battle', true], [10, 'shop', true]]) { G.col = col; G.node = node; G.endless = !!endless; out.push(W.stageTheme()); }
       return out.join(','); });
     check('backdrop changes with the stage', seq === 'dusk,night,rain,crimson,dawn,dusk', seq);
+    const recs = await p.evaluate(() => { const W = window.__g, G = W.G, out = []; G.scale = 'dark';
+      for (const [col, node, endless] of [[0, 'battle'], [4, 'battle'], [7, 'battle'], [8, 'boss'], [9, 'battle', true], [4, 'elite']]) { G.col = col; G.node = node; G.endless = !!endless; out.push(W.recommendBgm()); }
+      return out.join(','); });
+    check('BGM suggestion follows the backdrop', recs === 'dawn,neon,deep,storm,dawn,neon', recs);
+    const elite = await p.evaluate(() => { const W = window.__g, G = W.G; G.col = 4; G.node = 'elite'; G.endless = false; return W.bgmPool().join(','); });
+    check('elite stages offer Storm', elite.includes('storm'), elite);
     await p.waitForTimeout(400);
     check('no page errors with the backdrops', p.errors.length === 0, p.errors.join(' | '));
     await ctx.close();
