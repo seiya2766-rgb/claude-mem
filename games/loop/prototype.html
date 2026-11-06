@@ -393,6 +393,35 @@ select { background: #1a1130; }
 .stat span { font-size: 11px; color: var(--muted) !important; text-align: left !important; font-weight: 400 !important; font-family: var(--f-body) !important; }
 .stat.hi b { color: var(--gold); text-shadow: 0 0 10px color-mix(in srgb, var(--gold) 50%, transparent); }
 @media (max-width: 560px) { .end-summary { grid-template-columns: 1fr; justify-items: center; } .offers.shop { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kit-card { --c: var(--drum); position: relative; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 12%, transparent), transparent 75%), color-mix(in srgb, var(--surface) 80%, transparent);
+  border-color: color-mix(in srgb, var(--c) 30%, var(--line)); transition: transform .12s, box-shadow .12s, border-color .12s; }
+.kit-card::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 2px; border-radius: 2px; background: var(--c); box-shadow: 0 0 10px var(--c); opacity: .6; }
+.kit-card .offer-name { color: color-mix(in srgb, var(--c) 35%, #fff); }
+.kit-card:hover { transform: translateY(-2px); border-color: var(--c); }
+.kit-card[aria-pressed="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 0 22px -6px var(--c); }
+.kit-card[aria-pressed="true"]::before { opacity: 1; }
+/* ---- title screen ---- */
+#titleBg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 19; display: none; }
+.title-hero { display: none; }
+body.title-on #titleBg { display: block; }
+body.title-on .overlay { background: transparent; backdrop-filter: none; }
+body.title-on .modal { background: color-mix(in srgb, #0d0820 92%, transparent); backdrop-filter: none; /* a blur over the moving city would be re-rendered every frame */ box-shadow: 0 0 0 1px rgba(194, 109, 255, .25), 0 24px 70px rgba(0, 0, 0, .65), 0 0 60px -20px #c26dff; }
+/* Wide screens: logo and tagline on the left, the start panel on the right. Sizes are in px because the whole
+   page is zoomed on big monitors (fitScreen), so px keep the same proportions as at 1280x720. */
+@media (min-width: 1200px) {
+  body.title-on .overlay { justify-items: end; padding-right: 64px; }
+  body.title-on .title-hero { display: flex; flex-direction: column; gap: 10px; position: fixed; z-index: 20; left: 72px; top: 27%; pointer-events: none; }
+  body.title-on .modal.start .title h2 { display: none; }
+  .hero-logo { font-family: "Dela Gothic One", sans-serif; font-size: 124px; line-height: .95; letter-spacing: .04em;
+    background: linear-gradient(90deg, #36d6ff, #c26dff 50%, #ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 22px rgba(194, 109, 255, .65)) drop-shadow(0 4px 0 rgba(0, 0, 0, .4)); }
+  .hero-steps { display: flex; gap: 8px; }
+  .hero-steps span { flex: 1; max-width: 30px; height: 9px; border-radius: 3px; background: rgba(255, 255, 255, .14); transition: background .08s, box-shadow .08s; }
+  .hero-steps span.on { background: var(--lead); box-shadow: 0 0 12px var(--lead); }
+  .hero-steps span:nth-child(odd).on { background: var(--drum); box-shadow: 0 0 12px var(--drum); }
+  .hero-tag { margin: 8px 0 0; font-family: var(--f-display); font-size: 27px; color: #fff; text-shadow: 0 0 18px rgba(255, 95, 162, .8), 0 2px 0 rgba(0, 0, 0, .5); }
+  .hero-sub { margin: 0; font-size: 14px; letter-spacing: .12em; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 6px rgba(0, 0, 0, .8); }
+}
 :root[data-cb] { --drum: #0072b2; --bass: #009e73; --harm: #cc79a7; --lead: #e69f00; --noise: #d55e00; --life: #d55e00; --fx: #7a7f8c; }
 .offer.locked { opacity: .55; padding: 6px 10px; gap: 2px; }
 .modal.start { gap: 10px; padding-block: 16px; }
@@ -494,6 +523,13 @@ select { background: #1a1130; }
   </div>
   </div>
   </div>
+</div>
+<canvas id="titleBg" aria-hidden="true"></canvas>
+<div class="title-hero" aria-hidden="true">
+  <div class="hero-logo">LOOP</div>
+  <div class="hero-steps"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  <p class="hero-tag" data-i18n="title.tag"></p>
+  <p class="hero-sub" data-i18n="title.sub"></p>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -1937,9 +1973,12 @@ function cityRand(seed) {
 }
 const CITY_SIGNS = ['カラオケ', 'ライブ', 'ビート', 'レコード', '音楽', '深夜'];
 const CITY_ROOF_SIGNS = ['LOOP', 'DJ', 'BPM', '24H', 'OPEN', '♪'];
+// City layers are normally sized for the battlefield; layerTarget points them at another canvas (the title screen).
+let layerTarget = null;
+const layerTf = () => layerTarget ? layerTarget.tf : cx.getTransform();
 function newLayerCanvas() {
-  const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
-  const g = c.getContext('2d'); g.setTransform(cx.getTransform()); return { c, g };
+  const c = document.createElement('canvas'); c.width = layerTarget ? layerTarget.w : cv.width; c.height = layerTarget ? layerTarget.h : cv.height;
+  const g = c.getContext('2d'); g.setTransform(layerTf()); return { c, g };
 }
 function buildSky(th) {
   const { c, g } = newLayerCanvas();
@@ -1948,9 +1987,9 @@ function buildSky(th) {
   g.fillStyle = sky; g.fillRect(0, 0, CW, CH);
   const R = cityRand(11);
   for (let i = 0; i < th.stars; i++) { g.fillStyle = `rgba(255,255,255,${.15 + R() * .4})`; const big = R() < .12; g.fillRect(R() * CW, R() * CH * .6, big ? 1.6 : 1, big ? 1.6 : 1); }
-  const sx = BASE_X + (CW - BASE_X) * .74;
+  const sx = layerTarget && layerTarget.sunX != null ? CW * layerTarget.sunX : BASE_X + (CW - BASE_X) * .74;
   const halo = (x, y, r0, r1, rgba) => { const h = g.createRadialGradient(x, y, r0, x, y, r1); h.addColorStop(0, `rgba(${rgba})`); h.addColorStop(1, `rgba(${rgba.replace(/[\d.]+$/, '0')})`); g.fillStyle = h; g.fillRect(0, 0, CW, CH); };
-  const off = () => { const s = document.createElement('canvas'); s.width = c.width; s.height = c.height; const sg = s.getContext('2d'); sg.setTransform(cx.getTransform()); return [s, sg]; };
+  const off = () => { const s = document.createElement('canvas'); s.width = c.width; s.height = c.height; const sg = s.getContext('2d'); sg.setTransform(layerTf()); return [s, sg]; };
   const paste = (s, a) => { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = a; g.drawImage(s, 0, 0); g.restore(); };
   if (th.body === 'sun' || th.body === 'dawn') {
     const dawn = th.body === 'dawn', sy = CH * (dawn ? .58 : .5), sr = CH * (dawn ? .24 : .34);
@@ -2880,6 +2919,7 @@ function dailyLine() {
   const best = rec && rec.key === d.key ? (rec.score >= 99 ? t('daily.cleared') : t('daily.reached', { c: rec.score + 1, n: ROUTE_LEN })) : t('daily.none');
   return t('daily.desc', { date: d.key, kit: KITS[d.kit].name, best });
 }
+const KIT_COLOR = { rhythm: 'var(--drum)', harmony: 'var(--harm)', noise: 'var(--noise)', percussion: 'var(--lead)', ambient: 'var(--bass)', minimal: 'var(--gold)' };
 function showStart() {
   let kit = G && !kitLocked(G.kit) ? G.kit : 'rhythm', rank = G ? Math.min(G.rank, loadRank()) : 0;
   const draw = () => {
@@ -2892,7 +2932,7 @@ function showStart() {
       <div class="offers" id="kits">${Object.entries(KITS).map(([k, v]) => kitLocked(k) ? `
         <button class="offer locked" disabled><span class="kind">${t('m.lockTag')}</span><span class="offer-name">${v.name}</span>
           <span class="offer-desc">${t('m.locked', { n: v.unlock })}</span></button>` : `
-        <button class="offer" data-kit="${k}" aria-pressed="${k === kit}">
+        <button class="offer kit-card" data-kit="${k}" aria-pressed="${k === kit}" style="--c:${KIT_COLOR[k]}">
           <span class="offer-name">${v.name}</span>
           <span class="kit-tiles">${v.hand.map(id => tileHTML(id)).join('')}</span>
           <span class="offer-desc">${v.desc}</span></button>`).join('')}</div>
@@ -3108,6 +3148,55 @@ function keepKey(fn) { const r = G ? G.root : 9, sc = G ? G.scale : 'dark', sp =
 
 // ================= main loop =================
 let last = performance.now();
+// ---- title screen: the neon city at full size, with monsters marching down the street ----
+const tbg = document.getElementById('titleBg'), tbx = tbg.getContext('2d');
+let titleCache = null, titleT = 0;
+const PARADE = ['dot', 'hopper', 'block', 'dash', 'shield', 'healer', 'split', 'mirror', 'mini', 'stealth'];
+function buildTitle() {
+  const r = tbg.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, z = typeof uiZoom === 'number' ? uiZoom : 1;
+  const W = r.width / z, H = r.height / z;
+  tbg.width = Math.round(r.width * dpr); tbg.height = Math.round(r.height * dpr);
+  const tf = new DOMMatrix([dpr * z, 0, 0, dpr * z, 0, 0]);
+  tbx.setTransform(tf);
+  const keep = [CW, CH]; layerTarget = { w: tbg.width, h: tbg.height, tf, sunX: innerWidth >= 1200 ? .25 : .5 };
+  CW = W; CH = H * .92; // skylines stand on the street, which takes the bottom of the screen
+  try {
+    const th = THEMES.dusk;
+    CH = H; const sky = buildSky(th); CH = H * .9;
+    // street and vignette never change: paint them once into an overlay layer
+    const { c: front, g: fg } = newLayerCanvas(), street = H * .9;
+    const sg = fg.createLinearGradient(0, street, 0, H); sg.addColorStop(0, '#1a0c33'); sg.addColorStop(1, '#07040f');
+    fg.fillStyle = sg; fg.fillRect(0, street, W, H - street);
+    fg.fillStyle = 'rgba(255,95,162,.25)'; fg.fillRect(0, street - 3, W, 8);
+    fg.fillStyle = '#ff5fa2'; fg.fillRect(0, street, W, 2);
+    const v = fg.createRadialGradient(W * .5, H * .45, H * .2, W * .5, H * .5, W * .75);
+    v.addColorStop(0, 'rgba(7,4,15,0)'); v.addColorStop(1, 'rgba(7,4,15,.55)'); fg.fillStyle = v; fg.fillRect(0, 0, W, H);
+    titleCache = { W, H, key: tbg.width + 'x' + tbg.height, sky, front, far: buildSkyline(false, th), near: buildSkyline(true, th),
+      walkers: PARADE.map((type, i) => ({ type, x: W * (.15 + i * .2), seed: i * 3.1 })) };
+  } finally { [CW, CH] = keep; layerTarget = null; }
+}
+function drawTitle(dt) {
+  const r = tbg.getBoundingClientRect();
+  if (!titleCache || titleCache.key !== Math.round(r.width * (window.devicePixelRatio || 1)) + 'x' + Math.round(r.height * (window.devicePixelRatio || 1))) buildTitle();
+  const T = titleCache, { W, H } = T, street = H * .9;
+  titleT += dt;
+  tbx.save(); tbx.setTransform(1, 0, 0, 1, 0, 0);
+  tbx.drawImage(T.sky, 0, 0);
+  const scroll = (img, off, a) => { const k = tbg.width / W, o = ((off % W) + W) % W * k; tbx.globalAlpha = a; tbx.drawImage(img, -o, 0); tbx.drawImage(img, tbg.width - o, 0); tbx.globalAlpha = 1; };
+  scroll(T.far.c, titleT * 5, .8);
+  scroll(T.near.c, titleT * 12, .95);
+  tbx.drawImage(T.front, 0, 0);
+  tbx.restore();
+  // lane markings rushing past on the street
+  tbx.fillStyle = 'rgba(54,214,255,.35)';
+  for (let x = -((titleT * 120) % 80); x < W; x += 80) tbx.fillRect(x, street + (H - street) * .55, 40, 2);
+  // monsters marching toward the speaker side of the screen
+  const sz = Math.max(14, Math.min(26, H * .03));
+  for (const m of T.walkers) {
+    m.x -= dt * W * .035; if (m.x < -60) m.x += W * 2.1;
+    if (m.x < W + 60) drawEnemy(tbx, m.type, m.x, street - sz * .95, sz, { seed: m.seed, glow: sz * .8 });
+  }
+}
 function frame(now) {
   const raw = Math.min(.1, (now - last) / 1000); last = now;
   const dt = raw * G.speed;
@@ -3115,11 +3204,12 @@ function frame(now) {
   else if (G.listening) { const sd = STEP_DUR * 100 / (G.bpm || 100); G.acc += dt; while (G.acc >= sd) { G.acc -= sd; doStep(); } }
   pollGamepad(now);
   idleBgm(dt);
-  drawField(raw);
+  const titleOn = !!G && G.phase === 'menu' && !$('overlay').hidden;
+  if (document.body.classList.contains('title-on') !== titleOn) document.body.classList.toggle('title-on', titleOn);
+  if (titleOn) drawTitle(raw); else drawField(raw);
   drawViz();
   tutCheck();
-  const ts = document.getElementById('titleSteps');
-  if (ts) { const k = ac ? idleCount % 8 : Math.floor(now / 300) % 8; ts.querySelectorAll('span').forEach((x, i) => x.classList.toggle('on', i === k)); }
+  if (titleOn) { const k = ac ? idleCount % 8 : Math.floor(now / 300) % 8; document.querySelectorAll('#titleSteps span, .hero-steps span').forEach(x => x.classList.toggle('on', [...x.parentNode.children].indexOf(x) === k)); }
   requestAnimationFrame(frame);
 }
 
